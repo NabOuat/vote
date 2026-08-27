@@ -1,0 +1,81 @@
+import { voteApiFetch, voteTokenStore } from './voteClient.js'
+
+/** Ping non authentifié — sert uniquement à savoir si le backend répond. */
+export async function checkVoteBackendHealth() {
+  try {
+    const res = await fetch('/api/health')
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+/* ── Auth ─────────────────────────────────────────────────────────── */
+export async function voteLogin({ username, password }) {
+  const data = await voteApiFetch('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  })
+  voteTokenStore.set(data.token)
+  return data
+}
+
+export function voteLogout() {
+  voteTokenStore.clear()
+}
+
+/* ── Admin — sessions & votes ─────────────────────────────────────── */
+export const listSessions        = () => voteApiFetch('/admin/sessions')
+export const createSession       = (data) => voteApiFetch('/admin/sessions', { method: 'POST', body: JSON.stringify(data) })
+export const getSessionDetail    = (id) => voteApiFetch(`/admin/sessions/${id}`)
+export const createVote          = (sessionId, data) => voteApiFetch(`/admin/sessions/${sessionId}/votes`, { method: 'POST', body: JSON.stringify(data) })
+export const getVoteDetail       = (voteId) => voteApiFetch(`/admin/votes/${voteId}`)
+export const getVoteResultsAdmin  = (voteId) => voteApiFetch(`/admin/votes/${voteId}/results`)
+export const publishTourResults   = (tourId) => voteApiFetch(`/admin/tours/${tourId}/publish`, { method: 'POST' })
+
+/* ── Admin — candidats ────────────────────────────────────────────── */
+export function createCandidate(tourId, { fullName, program, photo }) {
+  const form = new FormData()
+  form.append('fullName', fullName)
+  if (program) form.append('program', program)
+  form.append('photo', photo)
+  return voteApiFetch(`/admin/tours/${tourId}/candidates`, { method: 'POST', body: form })
+}
+export const deleteCandidate = (candidateId) => voteApiFetch(`/admin/candidates/${candidateId}`, { method: 'DELETE' })
+
+/* ── Admin — votants ──────────────────────────────────────────────── */
+export const importVoters = (voters) => voteApiFetch('/admin/voters/import', { method: 'POST', body: JSON.stringify({ voters }) })
+
+/* ── Votant ───────────────────────────────────────────────────────── */
+export const listMyVotes    = () => voteApiFetch('/me/votes')
+export const castBallot     = (tourId, candidateId) => voteApiFetch(`/tours/${tourId}/ballot`, { method: 'POST', body: JSON.stringify({ candidateId }) })
+export const getTourResults = (tourId) => voteApiFetch(`/tours/${tourId}/results`)
+
+export function candidatePhotoUrl(photoPath) {
+  return `/api/uploads/${photoPath}`
+}
+
+/* ── Auto-saisie candidat (public, protégé par jeton — pas de compte) ────
+ * Appels directs en fetch : aucune authentification n'entre en jeu ici. */
+export async function getCandidateSelf(candidateId, token) {
+  const res = await fetch(`/api/candidates/${candidateId}/self?token=${encodeURIComponent(token)}`)
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(data?.message ?? 'Lien invalide.')
+  return data
+}
+
+export async function updateCandidateSelf(candidateId, token, program) {
+  const res = await fetch(`/api/candidates/${candidateId}/self?token=${encodeURIComponent(token)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ program }),
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(data?.message ?? 'Erreur lors de l\'enregistrement.')
+  return data
+}
+
+/** Construit le lien à transmettre au candidat pour qu'il saisisse son programme. */
+export function candidateSelfLink(candidateId, token) {
+  return `${window.location.origin}/candidat/${candidateId}?token=${token}`
+}
