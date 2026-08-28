@@ -3,35 +3,40 @@ import bcrypt from 'bcryptjs'
 import { randomUUID } from 'node:crypto'
 import { db } from '../db.js'
 import { requireAuth, requireRole } from '../middleware/auth.js'
-import { uploadCandidatePhoto } from '../middleware/upload.js'
+import { uploadCandidatePhoto, storeCandidatePhoto } from '../middleware/upload.js'
 import { tallyTour } from '../services/tally.service.js'
+import { asyncHandler } from '../lib/asyncHandler.js'
 
 export const adminRouter = Router()
 adminRouter.use(requireAuth, requireRole('ADMIN_VOTE'))
 
 /* ── Sessions ─────────────────────────────────────────────────────── */
-adminRouter.post('/sessions', (req, res) => {
+adminRouter.post('/sessions', asyncHandler(async (req, res) => {
   const { label, description } = req.body ?? {}
   if (!label?.trim()) return res.status(400).json({ message: 'Le libellé est requis.' })
-  const result = db.prepare('INSERT INTO sessions (label, description, created_by) VALUES (?, ?, ?)')
-    .run(label.trim(), description ?? null, req.user.sub)
-  res.status(201).json(db.prepare('SELECT * FROM sessions WHERE id = ?').get(result.lastInsertRowid))
-})
+  const result = await db.execute({
+    sql: 'INSERT INTO sessions (label, description, created_by) VALUES (?, ?, ?)',
+    args: [label.trim(), description ?? null, req.user.sub],
+  })
+  const { rows: [session] } = await db.execute({ sql: 'SELECT * FROM sessions WHERE id = ?', args: [result.lastInsertRowid] })
+  res.status(201).json(session)
+}))
 
-adminRouter.get('/sessions', (req, res) => {
-  res.json(db.prepare('SELECT * FROM sessions ORDER BY created_at DESC').all())
-})
+adminRouter.get('/sessions', asyncHandler(async (req, res) => {
+  const { rows } = await db.execute('SELECT * FROM sessions ORDER BY created_at DESC')
+  res.json(rows)
+}))
 
-adminRouter.get('/sessions/:sessionId', (req, res) => {
-  const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(req.params.sessionId)
+adminRouter.get('/sessions/:sessionId', asyncHandler(async (req, res) => {
+  const { rows: [session] } = await db.execute({ sql: 'SELECT * FROM sessions WHERE id = ?', args: [req.params.sessionId] })
   if (!session) return res.status(404).json({ message: 'Session introuvable.' })
-  const votes = db.prepare('SELECT * FROM votes WHERE session_id = ? ORDER BY created_at').all(session.id)
+  const { rows: votes } = await db.execute({ sql: 'SELECT * FROM votes WHERE session_id = ? ORDER BY created_at', args: [session.id] })
   res.json({ ...session, votes })
-})
+}))
 
 /* ── Votes (+ tours) ──────────────────────────────────────────────── */
-adminRouter.post('/sessions/:sessionId/votes', (req, res) => {
-  const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(req.params.sessionId)
+adminRouter.post('/sessions/:sessionId/votes', asyncHandler(async (req, res) => {
+  const { rows: [session] } = await db.execute({ sql: 'SELECT * FROM sessions WHERE id = ?', args: [req.params.sessionId] })
   if (!session) return res.status(404).json({ message: 'Session introuvable.' })
 
   const { label, roundsCount, tour1, tour2 } = req.body ?? {}
@@ -48,134 +53,149 @@ adminRouter.post('/sessions/:sessionId/votes', (req, res) => {
     return res.status(400).json({ message: 'Le tour 2 doit commencer après la fin du tour 1.' })
   }
 
-  const tx = db.transaction(() => {
-    const vote = db.prepare('INSERT INTO votes (session_id, label, rounds_count) VALUES (?, ?, ?)')
-      .run(session.id, label.trim(), roundsCount)
-    const voteId = vote.lastInsertRowid
+  const tx = await db.transaction('write')
+  let voteId
+  try {
+    const vote = await tx.execute({
+      sql: 'INSERT INTO votes (session_id, label, rounds_count) VALUES (?, ?, ?)',
+      args: [session.id, label.trim(), roundsCount],
+    })
+    voteId = vote.lastInsertRowid
 
-    db.prepare('INSERT INTO tours (vote_id, tour_number, starts_at, ends_at) VALUES (?, 1, ?, ?)')
-      .run(voteId, tour1.startsAt, tour1.endsAt)
+    await tx.execute({
+      sql: 'INSERT INTO tours (vote_id, tour_number, starts_at, ends_at) VALUES (?, 1, ?, ?)',
+      args: [voteId, tour1.startsAt, tour1.endsAt],
+    })
     if (roundsCount === 2) {
-      db.prepare('INSERT INTO tours (vote_id, tour_number, starts_at, ends_at) VALUES (?, 2, ?, ?)')
-        .run(voteId, tour2.startsAt, tour2.endsAt)
+      await tx.execute({
+        sql: 'INSERT INTO tours (vote_id, tour_number, starts_at, ends_at) VALUES (?, 2, ?, ?)',
+        args: [voteId, tour2.startsAt, tour2.endsAt],
+      })
     }
-    return voteId
-  })
+    await tx.commit()
+  } catch (err) {
+    await tx.rollback()
+    throw err
+  }
 
-  const voteId = tx()
-  res.status(201).json(getVoteDetail(voteId))
-})
+  res.status(201).json(await getVoteDetail(voteId))
+}))
 
-function getVoteDetail(voteId) {
-  const vote = db.prepare('SELECT * FROM votes WHERE id = ?').get(voteId)
+async function getVoteDetail(voteId) {
+  const { rows: [vote] } = await db.execute({ sql: 'SELECT * FROM votes WHERE id = ?', args: [voteId] })
   if (!vote) return null
-  const tours = db.prepare('SELECT * FROM tours WHERE vote_id = ? ORDER BY tour_number').all(voteId)
-  const toursWithCandidates = tours.map(t => ({
-    ...t,
-    candidates: db.prepare('SELECT id, full_name, photo_path, program, edit_token FROM candidates WHERE tour_id = ?').all(t.id),
+  const { rows: tours } = await db.execute({ sql: 'SELECT * FROM tours WHERE vote_id = ? ORDER BY tour_number', args: [voteId] })
+  const toursWithCandidates = await Promise.all(tours.map(async (t) => {
+    const { rows: candidates } = await db.execute({
+      sql: 'SELECT id, full_name, photo_path, program, edit_token FROM candidates WHERE tour_id = ?',
+      args: [t.id],
+    })
+    return { ...t, candidates }
   }))
   return { ...vote, tours: toursWithCandidates }
 }
 
-adminRouter.get('/votes/:voteId', (req, res) => {
-  const detail = getVoteDetail(req.params.voteId)
+adminRouter.get('/votes/:voteId', asyncHandler(async (req, res) => {
+  const detail = await getVoteDetail(req.params.voteId)
   if (!detail) return res.status(404).json({ message: 'Vote introuvable.' })
   res.json(detail)
-})
+}))
 
 /* ── Candidats ────────────────────────────────────────────────────── */
-adminRouter.post('/tours/:tourId/candidates', (req, res) => {
-  uploadCandidatePhoto(req, res, err => {
+adminRouter.post('/tours/:tourId/candidates', (req, res, next) => {
+  uploadCandidatePhoto(req, res, (err) => {
     if (err) return res.status(400).json({ message: err.message })
-
-    const tour = db.prepare('SELECT * FROM tours WHERE id = ?').get(req.params.tourId)
-    if (!tour) return res.status(404).json({ message: 'Tour introuvable.' })
-    if (tour.status !== 'UPCOMING') {
-      return res.status(409).json({ message: 'Impossible de modifier les candidats une fois le tour ouvert.' })
-    }
-    const { fullName, program } = req.body ?? {}
-    if (!fullName?.trim()) return res.status(400).json({ message: 'Le nom du candidat est requis.' })
-    if (!req.file) return res.status(400).json({ message: 'La photo est obligatoire.' })
-
-    const photoPath = `candidates/${req.file.filename}`
-    const editToken = randomUUID()
-    const result = db.prepare(
-      'INSERT INTO candidates (tour_id, full_name, photo_path, program, edit_token) VALUES (?, ?, ?, ?, ?)'
-    ).run(tour.id, fullName.trim(), photoPath, program?.trim() || null, editToken)
-
-    res.status(201).json(db.prepare('SELECT * FROM candidates WHERE id = ?').get(result.lastInsertRowid))
+    handleCreateCandidate(req, res).catch(next)
   })
 })
 
-adminRouter.delete('/candidates/:candidateId', (req, res) => {
-  const candidate = db.prepare('SELECT * FROM candidates WHERE id = ?').get(req.params.candidateId)
+async function handleCreateCandidate(req, res) {
+  const { rows: [tour] } = await db.execute({ sql: 'SELECT * FROM tours WHERE id = ?', args: [req.params.tourId] })
+  if (!tour) return res.status(404).json({ message: 'Tour introuvable.' })
+  if (tour.status !== 'UPCOMING') {
+    return res.status(409).json({ message: 'Impossible de modifier les candidats une fois le tour ouvert.' })
+  }
+  const { fullName, program } = req.body ?? {}
+  if (!fullName?.trim()) return res.status(400).json({ message: 'Le nom du candidat est requis.' })
+  if (!req.file) return res.status(400).json({ message: 'La photo est obligatoire.' })
+
+  const photoPath = await storeCandidatePhoto(req.file)
+  const editToken = randomUUID()
+  const result = await db.execute({
+    sql: 'INSERT INTO candidates (tour_id, full_name, photo_path, program, edit_token) VALUES (?, ?, ?, ?, ?)',
+    args: [tour.id, fullName.trim(), photoPath, program?.trim() || null, editToken],
+  })
+
+  const { rows: [candidate] } = await db.execute({ sql: 'SELECT * FROM candidates WHERE id = ?', args: [result.lastInsertRowid] })
+  res.status(201).json(candidate)
+}
+
+adminRouter.delete('/candidates/:candidateId', asyncHandler(async (req, res) => {
+  const { rows: [candidate] } = await db.execute({ sql: 'SELECT * FROM candidates WHERE id = ?', args: [req.params.candidateId] })
   if (!candidate) return res.status(404).json({ message: 'Candidat introuvable.' })
-  const tour = db.prepare('SELECT * FROM tours WHERE id = ?').get(candidate.tour_id)
+  const { rows: [tour] } = await db.execute({ sql: 'SELECT * FROM tours WHERE id = ?', args: [candidate.tour_id] })
   if (tour.status !== 'UPCOMING') {
     return res.status(409).json({ message: 'Impossible de supprimer un candidat une fois le tour ouvert.' })
   }
-  db.prepare('DELETE FROM candidates WHERE id = ?').run(candidate.id)
+  await db.execute({ sql: 'DELETE FROM candidates WHERE id = ?', args: [candidate.id] })
   res.status(204).end()
-})
+}))
 
 /* ── Votants (import en masse) ────────────────────────────────────── */
-adminRouter.post('/voters/import', (req, res) => {
+adminRouter.post('/voters/import', asyncHandler(async (req, res) => {
   const { voters } = req.body ?? {}
   if (!Array.isArray(voters) || voters.length === 0) {
     return res.status(400).json({ message: 'La liste des votants est vide.' })
   }
 
-  const insert = db.prepare(
-    'INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, ?, ?)'
-  )
   const created = []
   const errors = []
-  const tx = db.transaction(() => {
-    for (const v of voters) {
-      if (!v.username?.trim() || !v.fullName?.trim() || !v.password) {
-        errors.push({ username: v.username ?? null, message: 'username, fullName et password sont requis.' })
-        continue
-      }
-      try {
-        const hash = bcrypt.hashSync(v.password, 10)
-        const result = insert.run(v.username.trim(), hash, 'VOTER', v.fullName.trim())
-        created.push({ id: result.lastInsertRowid, username: v.username.trim() })
-      } catch (err) {
-        errors.push({ username: v.username, message: String(err.message).includes('UNIQUE') ? 'Identifiant déjà utilisé.' : err.message })
-      }
+  for (const v of voters) {
+    if (!v.username?.trim() || !v.fullName?.trim() || !v.password) {
+      errors.push({ username: v.username ?? null, message: 'username, fullName et password sont requis.' })
+      continue
     }
-  })
-  tx()
+    try {
+      const hash = bcrypt.hashSync(v.password, 10)
+      const result = await db.execute({
+        sql: 'INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, ?, ?)',
+        args: [v.username.trim(), hash, 'VOTER', v.fullName.trim()],
+      })
+      created.push({ id: Number(result.lastInsertRowid), username: v.username.trim() })
+    } catch (err) {
+      errors.push({ username: v.username, message: String(err.message).includes('UNIQUE') ? 'Identifiant déjà utilisé.' : err.message })
+    }
+  }
 
   res.status(201).json({ created, errors })
-})
+}))
 
 /* ── Résultats & publication ──────────────────────────────────────────
  * Le dépouillement d'un tour n'est jamais exposé (même à l'admin) tant que ce
  * tour précis n'est pas CLOSED — "les résultats sont calculés à la clôture".
  * La publication est une action PAR TOUR (pas par vote) : publier le tour 1
  * ne doit jamais révéler un dépouillement en direct du tour 2 encore ouvert. */
-adminRouter.get('/votes/:voteId/results', (req, res) => {
-  const vote = db.prepare('SELECT * FROM votes WHERE id = ?').get(req.params.voteId)
+adminRouter.get('/votes/:voteId/results', asyncHandler(async (req, res) => {
+  const { rows: [vote] } = await db.execute({ sql: 'SELECT * FROM votes WHERE id = ?', args: [req.params.voteId] })
   if (!vote) return res.status(404).json({ message: 'Vote introuvable.' })
-  const tours = db.prepare('SELECT * FROM tours WHERE vote_id = ? ORDER BY tour_number').all(vote.id)
-  const results = tours.map(t => ({
+  const { rows: tours } = await db.execute({ sql: 'SELECT * FROM tours WHERE vote_id = ? ORDER BY tour_number', args: [vote.id] })
+  const results = await Promise.all(tours.map(async (t) => ({
     tourId: t.id,
     tourNumber: t.tour_number,
     status: t.status,
     publishedAt: t.results_published_at,
-    ranking: t.status === 'CLOSED' ? tallyTour(t.id) : null,
-  }))
+    ranking: t.status === 'CLOSED' ? await tallyTour(t.id) : null,
+  })))
   res.json({ voteId: vote.id, results })
-})
+}))
 
-adminRouter.post('/tours/:tourId/publish', (req, res) => {
-  const tour = db.prepare('SELECT * FROM tours WHERE id = ?').get(req.params.tourId)
+adminRouter.post('/tours/:tourId/publish', asyncHandler(async (req, res) => {
+  const { rows: [tour] } = await db.execute({ sql: 'SELECT * FROM tours WHERE id = ?', args: [req.params.tourId] })
   if (!tour) return res.status(404).json({ message: 'Tour introuvable.' })
   if (tour.status !== 'CLOSED') {
     return res.status(409).json({ message: 'Impossible de publier les résultats avant la clôture de ce tour.' })
   }
   const now = new Date().toISOString()
-  db.prepare('UPDATE tours SET results_published_at = ? WHERE id = ?').run(now, tour.id)
+  await db.execute({ sql: 'UPDATE tours SET results_published_at = ? WHERE id = ?', args: [now, tour.id] })
   res.json({ tourId: tour.id, publishedAt: now })
-})
+}))

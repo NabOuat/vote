@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3'
+import { createClient } from '@libsql/client'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -6,39 +6,55 @@ import { randomUUID } from 'node:crypto'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-const DB_PATH = process.env.VOTE_DB_PATH ?? join(__dirname, '..', 'vote.db')
-
-export const db = new Database(DB_PATH)
-db.pragma('journal_mode = WAL')
-db.pragma('foreign_keys = ON')
+// Sans variable d'env → fichier SQLite local (dev). En prod, VOTE_DB_URL
+// pointe vers une base Turso (libsql://...) — même client, même API, aucun
+// autre changement de code entre les deux environnements.
+export const db = createClient({
+  url: process.env.VOTE_DB_URL ?? `file:${join(__dirname, '..', 'vote.db')}`,
+  authToken: process.env.VOTE_DB_TOKEN,
+})
 
 /** Ajoute une colonne si elle n'existe pas déjà — évite un vrai système de
  * migration pour ce projet de cette taille, sans casser les bases existantes
  * (ALTER TABLE ADD COLUMN n'est pas idempotent, contrairement à CREATE TABLE
  * IF NOT EXISTS utilisé dans 001_init.sql). */
-function ensureColumn(table, column, definition) {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name)
+async function ensureColumn(table, column, definition) {
+  const { rows } = await db.execute(`PRAGMA table_info(${table})`)
+  const cols = rows.map((c) => c.name)
   if (!cols.includes(column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+    await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
   }
 }
 
-function runMigrations() {
+async function runMigrations() {
   const sql = readFileSync(join(__dirname, 'migrations', '001_init.sql'), 'utf-8')
-  db.exec(sql)
+  await db.executeMultiple(sql)
 
   // 002 — lien d'auto-saisie du programme par le candidat lui-même.
-  ensureColumn('candidates', 'edit_token', 'TEXT')
-  const missingToken = db.prepare('SELECT id FROM candidates WHERE edit_token IS NULL').all()
+  await ensureColumn('candidates', 'edit_token', 'TEXT')
+  const { rows: missingToken } = await db.execute('SELECT id FROM candidates WHERE edit_token IS NULL')
   if (missingToken.length > 0) {
-    const setToken = db.prepare('UPDATE candidates SET edit_token = ? WHERE id = ?')
-    const tx = db.transaction(() => {
-      for (const c of missingToken) setToken.run(randomUUID(), c.id)
-    })
-    tx()
+    const tx = await db.transaction('write')
+    try {
+      for (const c of missingToken) {
+        await tx.execute({ sql: 'UPDATE candidates SET edit_token = ? WHERE id = ?', args: [randomUUID(), c.id] })
+      }
+      await tx.commit()
+    } catch (err) {
+      await tx.rollback()
+      throw err
+    }
   }
 }
 
-runMigrations()
+let migrated = null
+/** Garantit que la migration ne tourne qu'une fois par instance de fonction
+ * serverless (les cold starts suivants la relancent, ce qui est sans risque
+ * grâce à IF NOT EXISTS / ensureColumn, mais inutile de la refaire à chaque
+ * requête d'une même instance encore chaude). */
+export function migrate() {
+  if (!migrated) migrated = runMigrations()
+  return migrated
+}
 
 export default db

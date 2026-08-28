@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { db } from '../db.js'
+import { asyncHandler } from '../lib/asyncHandler.js'
 
 /**
  * Auto-saisie du programme par le candidat lui-même — pas de compte, pas
@@ -10,19 +11,19 @@ import { db } from '../db.js'
  */
 export const candidateRouter = Router()
 
-function getCandidateByToken(candidateId, token) {
+async function getCandidateByToken(candidateId, token) {
   if (!token) return null
-  const candidate = db.prepare('SELECT * FROM candidates WHERE id = ?').get(candidateId)
+  const { rows: [candidate] } = await db.execute({ sql: 'SELECT * FROM candidates WHERE id = ?', args: [candidateId] })
   if (!candidate || candidate.edit_token !== token) return null
   return candidate
 }
 
 /** GET /candidates/:id/self?token=... — consulter ses propres infos. */
-candidateRouter.get('/:candidateId/self', (req, res) => {
-  const candidate = getCandidateByToken(req.params.candidateId, req.query.token)
+candidateRouter.get('/:candidateId/self', asyncHandler(async (req, res) => {
+  const candidate = await getCandidateByToken(req.params.candidateId, req.query.token)
   if (!candidate) return res.status(404).json({ message: 'Lien invalide.' })
 
-  const tour = db.prepare('SELECT status FROM tours WHERE id = ?').get(candidate.tour_id)
+  const { rows: [tour] } = await db.execute({ sql: 'SELECT status FROM tours WHERE id = ?', args: [candidate.tour_id] })
   res.json({
     id: candidate.id,
     fullName: candidate.full_name,
@@ -30,21 +31,21 @@ candidateRouter.get('/:candidateId/self', (req, res) => {
     program: candidate.program,
     editable: tour?.status === 'UPCOMING',
   })
-})
+}))
 
 /** PUT /candidates/:id/self?token=... — renseigner son programme, uniquement
  * tant que le tour n'a pas encore ouvert (empêche toute modification une
  * fois le vote lancé). */
-candidateRouter.put('/:candidateId/self', (req, res) => {
-  const candidate = getCandidateByToken(req.params.candidateId, req.query.token)
+candidateRouter.put('/:candidateId/self', asyncHandler(async (req, res) => {
+  const candidate = await getCandidateByToken(req.params.candidateId, req.query.token)
   if (!candidate) return res.status(404).json({ message: 'Lien invalide.' })
 
-  const tour = db.prepare('SELECT status FROM tours WHERE id = ?').get(candidate.tour_id)
+  const { rows: [tour] } = await db.execute({ sql: 'SELECT status FROM tours WHERE id = ?', args: [candidate.tour_id] })
   if (tour?.status !== 'UPCOMING') {
     return res.status(409).json({ message: 'Le programme ne peut plus être modifié : le tour a déjà commencé.' })
   }
 
   const { program } = req.body ?? {}
-  db.prepare('UPDATE candidates SET program = ? WHERE id = ?').run(program?.trim() || null, candidate.id)
+  await db.execute({ sql: 'UPDATE candidates SET program = ? WHERE id = ?', args: [program?.trim() || null, candidate.id] })
   res.json({ id: candidate.id, program: program?.trim() || null })
-})
+}))

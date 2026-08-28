@@ -14,51 +14,65 @@ export class BallotError extends Error {
  * avec le même identifiant). Le flush périodique (voir flushStaging) mélange
  * et migre ensuite vers `ballots`, qui ne contient aucune trace de l'électeur.
  */
-export function castBallot({ tourId, voterId, candidateId }) {
-  const tour = db.prepare('SELECT * FROM tours WHERE id = ?').get(tourId)
+export async function castBallot({ tourId, voterId, candidateId }) {
+  const { rows: [tour] } = await db.execute({ sql: 'SELECT * FROM tours WHERE id = ?', args: [tourId] })
   if (!tour) throw new BallotError(404, 'Tour introuvable.')
   if (tour.status !== 'ONGOING') throw new BallotError(409, "Ce tour n'est pas ouvert au vote.")
 
-  const candidate = db.prepare('SELECT id FROM candidates WHERE id = ? AND tour_id = ?').get(candidateId, tourId)
+  const { rows: [candidate] } = await db.execute({
+    sql: 'SELECT id FROM candidates WHERE id = ? AND tour_id = ?',
+    args: [candidateId, tourId],
+  })
   if (!candidate) throw new BallotError(400, 'Candidat invalide pour ce tour.')
 
-  const tx = db.transaction(() => {
+  const tx = await db.transaction('write')
+  try {
     try {
-      db.prepare('INSERT INTO vote_receipts (tour_id, voter_id) VALUES (?, ?)').run(tourId, voterId)
+      await tx.execute({ sql: 'INSERT INTO vote_receipts (tour_id, voter_id) VALUES (?, ?)', args: [tourId, voterId] })
     } catch (err) {
       if (String(err.message).includes('UNIQUE')) {
+        await tx.rollback()
         throw new BallotError(409, 'Vous avez déjà voté pour ce tour.')
       }
       throw err
     }
-    db.prepare('INSERT INTO ballots_staging (tour_id, candidate_id) VALUES (?, ?)').run(tourId, candidateId)
-  })
-  tx()
+    await tx.execute({ sql: 'INSERT INTO ballots_staging (tour_id, candidate_id) VALUES (?, ?)', args: [tourId, candidateId] })
+    await tx.commit()
+  } catch (err) {
+    if (!(err instanceof BallotError)) await tx.rollback().catch(() => {})
+    throw err
+  }
 }
 
 /** Mélange et migre les bulletins en attente d'un tour vers la table définitive. */
-export function flushStaging(tourId) {
-  const rows = db.prepare('SELECT id, candidate_id FROM ballots_staging WHERE tour_id = ?').all(tourId)
+export async function flushStaging(tourId) {
+  const { rows } = await db.execute({ sql: 'SELECT id, candidate_id FROM ballots_staging WHERE tour_id = ?', args: [tourId] })
   if (rows.length === 0) return
   shuffle(rows)
 
-  const insert = db.prepare('INSERT INTO ballots (tour_id, candidate_id) VALUES (?, ?)')
-  const del = db.prepare('DELETE FROM ballots_staging WHERE id = ?')
-  const tx = db.transaction(() => {
+  const tx = await db.transaction('write')
+  try {
     for (const row of rows) {
-      insert.run(tourId, row.candidate_id)
-      del.run(row.id)
+      await tx.execute({ sql: 'INSERT INTO ballots (tour_id, candidate_id) VALUES (?, ?)', args: [tourId, row.candidate_id] })
+      await tx.execute({ sql: 'DELETE FROM ballots_staging WHERE id = ?', args: [row.id] })
     }
+    await tx.commit()
+  } catch (err) {
+    await tx.rollback()
+    throw err
+  }
+}
+
+/** Flush de tous les tours ayant des bulletins en attente (appelé à chaque requête). */
+export async function flushAllStaging() {
+  const { rows } = await db.execute('SELECT DISTINCT tour_id FROM ballots_staging')
+  for (const row of rows) await flushStaging(row.tour_id)
+}
+
+export async function hasVoted(tourId, voterId) {
+  const { rows } = await db.execute({
+    sql: 'SELECT 1 FROM vote_receipts WHERE tour_id = ? AND voter_id = ?',
+    args: [tourId, voterId],
   })
-  tx()
-}
-
-/** Flush de tous les tours ayant des bulletins en attente (appelé périodiquement). */
-export function flushAllStaging() {
-  const tourIds = db.prepare('SELECT DISTINCT tour_id FROM ballots_staging').all().map(r => r.tour_id)
-  for (const tourId of tourIds) flushStaging(tourId)
-}
-
-export function hasVoted(tourId, voterId) {
-  return !!db.prepare('SELECT 1 FROM vote_receipts WHERE tour_id = ? AND voter_id = ?').get(tourId, voterId)
+  return rows.length > 0
 }

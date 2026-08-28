@@ -7,13 +7,11 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5174, // distinct du frontend Congés (5173) pour pouvoir tourner en parallèle
       proxy: {
-        // Le backend (vote-deg/server) monte ses routes à la racine
-        // (/auth, /admin, /candidates, /health, /uploads/...), sans préfixe —
-        // on retire /api avant de transmettre, comme en prod (cf. nginx).
+        // Le backend (vote-deg/server) monte ses routes sous /api/* (même
+        // convention qu'en prod sur Vercel) — proxy direct, sans réécriture.
         '/api': {
           target: process.env.VITE_VOTE_API_TARGET ?? 'http://localhost:4300',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ''),
         },
       },
     },

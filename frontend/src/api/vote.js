@@ -51,7 +51,15 @@ export const listMyVotes    = () => voteApiFetch('/me/votes')
 export const castBallot     = (tourId, candidateId) => voteApiFetch(`/tours/${tourId}/ballot`, { method: 'POST', body: JSON.stringify({ candidateId }) })
 export const getTourResults = (tourId) => voteApiFetch(`/tours/${tourId}/results`)
 
+/** photo_path est soit une URL Vercel Blob absolue (prod), soit un chemin
+ * `/api/uploads/candidates/...` servi par express.static en dev sans compte
+ * Blob (voir storeCandidatePhoto côté backend) — les deux se consomment tels
+ * quels. Dernier cas : l'ancien format `candidates/xxx` d'avant la migration
+ * Vercel, pour des données locales pas encore repassées par le script de
+ * migration. */
 export function candidatePhotoUrl(photoPath) {
+  if (!photoPath) return null
+  if (/^https?:\/\//.test(photoPath) || photoPath.startsWith('/api/uploads/')) return photoPath
   return `/api/uploads/${photoPath}`
 }
 
