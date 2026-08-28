@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { listSessions, createSession } from '../../api/vote.js'
+import { listSessions, createSession, deleteSession } from '../../api/vote.js'
 
 export default function AdminSessions() {
   const { colors } = theme
@@ -34,6 +34,19 @@ export default function AdminSessions() {
       toast.error(err.message ?? 'Erreur.', 'Erreur')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleDelete(e, session) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!window.confirm(`Supprimer la session "${session.label}" et tous ses votes ? Cette action est définitive.`)) return
+    try {
+      await deleteSession(session.id)
+      toast.success('Session supprimée.', 'Vote')
+      await load()
+    } catch (err) {
+      toast.error(err.message ?? 'Erreur.', 'Erreur')
     }
   }
 
@@ -77,6 +90,21 @@ export default function AdminSessions() {
                 <div style={{ fontWeight: 700, fontSize: 14, color: colors.gray900 }}>{s.label}</div>
                 {s.description && <div style={{ fontSize: 12, color: colors.gray500, marginTop: 3 }}>{s.description}</div>}
               </div>
+              <button
+                type="button"
+                onClick={e => handleDelete(e, s)}
+                title="Supprimer la session"
+                style={{
+                  width: 30, height: 30, borderRadius: 8, flexShrink: 0, border: 'none',
+                  background: 'transparent', color: colors.gray300, display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s, color 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = colors.errorBg; e.currentTarget.style.color = colors.errorText }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.gray300 }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.gray300} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                 <polyline points="9 18 15 12 9 6" />
               </svg>

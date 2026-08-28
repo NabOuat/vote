@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { getVoteDetail, getVoteResultsAdmin, createCandidate, deleteCandidate, publishTourResults, candidatePhotoUrl, candidateSelfLink } from '../../api/vote.js'
+import { getVoteDetail, getVoteResultsAdmin, createCandidate, deleteCandidate, deleteVote, publishTourResults, candidatePhotoUrl, candidateSelfLink } from '../../api/vote.js'
 
 export default function VoteManage() {
   const { voteId } = useParams()
+  const navigate = useNavigate()
   const { colors, radius } = theme
   const toast = useToast()
   const [vote, setVote] = useState(null)
@@ -66,6 +67,17 @@ export default function VoteManage() {
     }
   }
 
+  async function handleDeleteVote() {
+    if (!window.confirm(`Supprimer le vote "${vote.label}" et tous ses tours/candidats ? Cette action est définitive.`)) return
+    try {
+      await deleteVote(vote.id)
+      toast.success('Vote supprimé.', 'Vote')
+      navigate(`/admin/sessions/${vote.session_id}`)
+    } catch (err) {
+      toast.error(err.message ?? 'Erreur.', 'Erreur')
+    }
+  }
+
   async function handlePublish(tourId) {
     try {
       await publishTourResults(tourId)
@@ -88,6 +100,9 @@ export default function VoteManage() {
           <Link to={`/admin/sessions/${vote.session_id}`} style={{ fontSize: 12, color: colors.gray400 }}>← Session</Link>
           <div className="page-title" style={{ marginTop: 4 }}>{vote.label}</div>
         </div>
+        <button className="btn btn-secondary btn-sm" onClick={handleDeleteVote} style={{ color: colors.errorText }}>
+          Supprimer ce vote
+        </button>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -106,6 +121,11 @@ export default function VoteManage() {
                 <button className="btn btn-secondary btn-sm" onClick={() => { setForm({ fullName: '', program: '', photo: null }); setCandidateModal(tour.id) }}>
                   + Candidat
                 </button>
+              )}
+              {tour.status !== 'UPCOMING' && (
+                <span style={{ fontSize: 11, color: colors.gray400, fontStyle: 'italic' }}>
+                  Candidats verrouillés — le tour est {tour.status === 'ONGOING' ? 'ouvert' : 'clôturé'}
+                </span>
               )}
               {tour.status === 'CLOSED' && !tourResult?.publishedAt && (
                 <button className="btn btn-primary btn-sm" onClick={() => handlePublish(tour.id)}>Publier les résultats</button>

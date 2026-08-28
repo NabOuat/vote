@@ -34,6 +34,71 @@ adminRouter.get('/sessions/:sessionId', asyncHandler(async (req, res) => {
   res.json({ ...session, votes })
 }))
 
+/** Nombre de bulletins déjà déposés (reçus, pas les bulletins eux-mêmes) sur
+ * l'ensemble des tours d'un vote — sert de garde-fou avant toute suppression. */
+async function countReceiptsForVote(voteId) {
+  const { rows } = await db.execute({
+    sql: `SELECT COUNT(*) as n FROM vote_receipts WHERE tour_id IN (SELECT id FROM tours WHERE vote_id = ?)`,
+    args: [voteId],
+  })
+  return Number(rows[0].n)
+}
+
+/** Supprime un vote et tout ce qui en dépend (tours, candidats, bulletins).
+ * Pas d'ON DELETE CASCADE fiable ici : le client Turso distant (HTTP) ne
+ * garantit pas qu'un PRAGMA foreign_keys=ON posé sur un appel persiste sur le
+ * suivant — la cascade est donc faite explicitement, dans l'ordre des clés
+ * étrangères, au sein d'une transaction. */
+async function deleteVoteCascade(tx, voteId) {
+  const { rows: tours } = await tx.execute({ sql: 'SELECT id FROM tours WHERE vote_id = ?', args: [voteId] })
+  for (const t of tours) {
+    await tx.execute({ sql: 'DELETE FROM ballots WHERE tour_id = ?', args: [t.id] })
+    await tx.execute({ sql: 'DELETE FROM ballots_staging WHERE tour_id = ?', args: [t.id] })
+    await tx.execute({ sql: 'DELETE FROM vote_receipts WHERE tour_id = ?', args: [t.id] })
+    await tx.execute({ sql: 'DELETE FROM candidates WHERE tour_id = ?', args: [t.id] })
+  }
+  await tx.execute({ sql: 'DELETE FROM tours WHERE vote_id = ?', args: [voteId] })
+  await tx.execute({ sql: 'DELETE FROM votes WHERE id = ?', args: [voteId] })
+}
+
+adminRouter.delete('/sessions/:sessionId', asyncHandler(async (req, res) => {
+  const { rows: [session] } = await db.execute({ sql: 'SELECT * FROM sessions WHERE id = ?', args: [req.params.sessionId] })
+  if (!session) return res.status(404).json({ message: 'Session introuvable.' })
+  const { rows: votes } = await db.execute({ sql: 'SELECT id FROM votes WHERE session_id = ?', args: [session.id] })
+  for (const v of votes) {
+    if (await countReceiptsForVote(v.id) > 0) {
+      return res.status(409).json({ message: 'Impossible de supprimer : au moins un vote de cette session a déjà reçu des bulletins.' })
+    }
+  }
+  const tx = await db.transaction('write')
+  try {
+    for (const v of votes) await deleteVoteCascade(tx, v.id)
+    await tx.execute({ sql: 'DELETE FROM sessions WHERE id = ?', args: [session.id] })
+    await tx.commit()
+  } catch (err) {
+    await tx.rollback()
+    throw err
+  }
+  res.status(204).end()
+}))
+
+adminRouter.delete('/votes/:voteId', asyncHandler(async (req, res) => {
+  const { rows: [vote] } = await db.execute({ sql: 'SELECT * FROM votes WHERE id = ?', args: [req.params.voteId] })
+  if (!vote) return res.status(404).json({ message: 'Vote introuvable.' })
+  if (await countReceiptsForVote(vote.id) > 0) {
+    return res.status(409).json({ message: 'Impossible de supprimer : ce vote a déjà reçu des bulletins.' })
+  }
+  const tx = await db.transaction('write')
+  try {
+    await deleteVoteCascade(tx, vote.id)
+    await tx.commit()
+  } catch (err) {
+    await tx.rollback()
+    throw err
+  }
+  res.status(204).end()
+}))
+
 /* ── Votes (+ tours) ──────────────────────────────────────────────── */
 adminRouter.post('/sessions/:sessionId/votes', asyncHandler(async (req, res) => {
   const { rows: [session] } = await db.execute({ sql: 'SELECT * FROM sessions WHERE id = ?', args: [req.params.sessionId] })
@@ -45,6 +110,12 @@ adminRouter.post('/sessions/:sessionId/votes', asyncHandler(async (req, res) => 
   if (!tour1?.startsAt || !tour1?.endsAt) return res.status(400).json({ message: 'Période du tour 1 requise.' })
   if (roundsCount === 2 && (!tour2?.startsAt || !tour2?.endsAt)) {
     return res.status(400).json({ message: 'Période du tour 2 requise pour un vote à 2 tours (passage automatique).' })
+  }
+  // Le tour 1 ne doit pas démarrer déjà passé — sinon il s'ouvre immédiatement,
+  // avant même que des candidats aient pu être ajoutés (verrouillé une fois
+  // ONGOING), ce qui bloque le vote sans recours possible depuis l'admin.
+  if (new Date(tour1.startsAt).getTime() < Date.now() + 5 * 60000) {
+    return res.status(400).json({ message: 'Le tour 1 doit démarrer au moins 5 minutes dans le futur (le temps d\'ajouter les candidats avant l\'ouverture).' })
   }
   if (new Date(tour1.endsAt) <= new Date(tour1.startsAt)) {
     return res.status(400).json({ message: 'La fin du tour 1 doit être postérieure à son début.' })
