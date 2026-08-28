@@ -59,6 +59,19 @@
   .card { padding: 14px; }
 
   thead th, tbody td { padding: 9px 10px; font-size: 12px; }
+
+  /* En-tête du module vote (VoteLayout) : logo + nav + identité + déconnexion
+     ne tiennent pas tous sur une largeur de téléphone — on masque le texte
+     non essentiel plutôt que de laisser déborder horizontalement. */
+  .vote-header { gap: 10px !important; padding-left: 16px !important; padding-right: 16px !important; }
+  .vote-header-username { display: none !important; }
+  .vote-header-logout-text { display: none; }
+  .vote-header-logout-icon { display: inline-flex !important; }
+  .vote-header-logout { padding: 8px !important; }
+}
+
+@media (max-width: 420px) {
+  .vote-header-title { display: none; }
 }
 
 body {
