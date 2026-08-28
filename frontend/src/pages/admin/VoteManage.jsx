@@ -4,6 +4,95 @@ import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { getVoteDetail, getVoteResultsAdmin, createCandidate, deleteCandidate, deleteVote, publishTourResults, candidatePhotoUrl, candidateSelfLink } from '../../api/vote.js'
 
+const STATUS = {
+  UPCOMING: { label: 'À venir', badge: 'badge-gray' },
+  ONGOING:  { label: 'En cours', badge: 'badge-green' },
+  CLOSED:   { label: 'Clôturé', badge: 'badge-orange' },
+}
+
+function ResultsBars({ ranking, colors }) {
+  const max = Math.max(1, ...ranking.map(r => r.votes))
+  const total = ranking.reduce((s, r) => s + r.votes, 0)
+  const winnerVotes = ranking[0]?.votes ?? 0
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
+      {ranking.map((r, i) => {
+        const isWinner = r.votes === winnerVotes && winnerVotes > 0
+        return (
+          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{
+              width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+              background: isWinner ? colors.orange : colors.gray100,
+              color: isWinner ? '#fff' : colors.gray500,
+              fontSize: 10.5, fontWeight: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>{i + 1}</span>
+            <img src={candidatePhotoUrl(r.photo_path)} alt={r.full_name}
+              style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', background: colors.gray100, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
+                <span style={{ fontWeight: 700, color: colors.gray800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.full_name}</span>
+                <span style={{ color: colors.gray500, fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>
+                  {r.votes} voix{total > 0 && ` · ${Math.round((r.votes / total) * 100)}%`}
+                </span>
+              </div>
+              <div style={{ height: 7, borderRadius: 999, background: colors.gray100, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 999, width: `${(r.votes / max) * 100}%`,
+                  background: isWinner ? `linear-gradient(90deg, ${colors.orange}, ${colors.orangeDark})` : `linear-gradient(90deg, ${colors.green}, ${colors.greenDark})`,
+                  transition: 'width 0.5s ease',
+                }} />
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, colors, radius }) {
+  return (
+    <div style={{
+      padding: '14px 12px 12px', borderRadius: radius.lg, textAlign: 'center', position: 'relative',
+      border: `1px solid ${colors.gray100}`, background: colors.white,
+      transition: 'box-shadow 0.15s',
+    }}>
+      {canEdit && (
+        <button onClick={onDelete} title="Supprimer ce candidat"
+          style={{
+            position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%', border: 'none',
+            background: colors.errorBg, color: colors.errorText, cursor: 'pointer', fontSize: 13,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>×</button>
+      )}
+      <img src={candidatePhotoUrl(candidate.photo_path)} alt={candidate.full_name}
+        style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', background: colors.gray100, boxShadow: theme.shadow.sm }} />
+      <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 8, color: colors.gray900 }}>{candidate.full_name}</div>
+      {votes != null && <div style={{ fontSize: 11.5, color: colors.gray500, marginTop: 2 }}>{votes} voix</div>}
+      {canEdit && (
+        <>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, marginTop: 6,
+            color: candidate.program ? colors.greenDark : colors.gray400,
+          }}>
+            {candidate.program ? (
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+            ) : (
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
+            )}
+            {candidate.program ? 'Programme reçu' : 'Programme en attente'}
+          </div>
+          <button type="button" onClick={onCopyLink}
+            style={{ display: 'block', width: '100%', marginTop: 8, fontSize: 10.5, fontWeight: 600, color: colors.green, background: 'none', border: `1px solid ${colors.gray200}`, borderRadius: 20, padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            Copier le lien candidat
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function VoteManage() {
   const { voteId } = useParams()
   const navigate = useNavigate()
@@ -105,16 +194,18 @@ export default function VoteManage() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         {vote.tours.map(tour => {
           const tourResult = resultsByTour.get(tour.id)
+          const st = STATUS[tour.status] ?? { label: tour.status, badge: 'badge-gray' }
+          const ranking = [...(tourResult?.ranking ?? [])].sort((a, b) => b.votes - a.votes)
           return (
           <div key={tour.id} className="card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>Tour {tour.tour_number}</div>
-              <span className="badge badge-gray">{tour.status}</span>
-              <span style={{ fontSize: 11, color: colors.gray400 }}>
-                {new Date(tour.starts_at).toLocaleString('fr-FR')} → {new Date(tour.ends_at).toLocaleString('fr-FR')}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+              <div style={{ fontWeight: 700, fontSize: 14.5, color: colors.gray900 }}>Tour {tour.tour_number}</div>
+              <span className={`badge ${st.badge}`}>{st.label}</span>
+              <span style={{ fontSize: 11.5, color: colors.gray400 }}>
+                {new Date(tour.starts_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })} → {new Date(tour.ends_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}
               </span>
               <div style={{ flex: 1 }} />
               {tour.status === 'UPCOMING' && (
@@ -123,7 +214,7 @@ export default function VoteManage() {
                 </button>
               )}
               {tour.status !== 'UPCOMING' && (
-                <span style={{ fontSize: 11, color: colors.gray400, fontStyle: 'italic' }}>
+                <span style={{ fontSize: 11.5, color: colors.gray400, fontStyle: 'italic' }}>
                   Candidats verrouillés — le tour est {tour.status === 'ONGOING' ? 'ouvert' : 'clôturé'}
                 </span>
               )}
@@ -131,38 +222,36 @@ export default function VoteManage() {
                 <button className="btn btn-primary btn-sm" onClick={() => handlePublish(tour.id)}>Publier les résultats</button>
               )}
               {tour.status === 'CLOSED' && tourResult?.publishedAt && (
-                <span className="badge badge-green">Résultats publiés</span>
+                <span className="badge badge-green" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+                  Résultats publiés
+                </span>
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
-              {tour.candidates.map(c => {
-                const votes = tourResult?.ranking?.find(r => r.id === c.id)?.votes
-                return (
-                  <div key={c.id} style={{ padding: 10, borderRadius: radius.md, border: `1px solid ${colors.gray100}`, textAlign: 'center', position: 'relative' }}>
-                    {tour.status === 'UPCOMING' && (
-                      <button onClick={() => handleDeleteCandidate(c.id)}
-                        style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: colors.errorBg, color: colors.errorText, cursor: 'pointer', fontSize: 12 }}>×</button>
-                    )}
-                    <img src={candidatePhotoUrl(c.photo_path)} alt={c.full_name} style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', background: colors.gray100 }} />
-                    <div style={{ fontSize: 12, fontWeight: 700, marginTop: 6 }}>{c.full_name}</div>
-                    {votes != null && <div style={{ fontSize: 11, color: colors.gray500 }}>{votes} voix</div>}
-                    {tour.status === 'UPCOMING' && (
-                      <>
-                        <div style={{ fontSize: 10, color: c.program ? colors.greenDark : colors.gray400, marginTop: 4 }}>
-                          {c.program ? '✓ Programme reçu' : 'Programme en attente'}
-                        </div>
-                        <button type="button" onClick={() => handleCopyLink(c)}
-                          style={{ marginTop: 6, fontSize: 10, fontWeight: 600, color: colors.green, background: 'none', border: `1px solid ${colors.gray200}`, borderRadius: 20, padding: '3px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
-                          Copier le lien candidat
-                        </button>
-                      </>
-                    )}
+            {tour.status === 'CLOSED' && ranking.length > 0 ? (
+              <ResultsBars ranking={ranking} colors={colors} />
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
+                {tour.candidates.map(c => (
+                  <CandidateAdminCard
+                    key={c.id}
+                    candidate={c}
+                    votes={ranking.find(r => r.id === c.id)?.votes}
+                    canEdit={tour.status === 'UPCOMING'}
+                    onDelete={() => handleDeleteCandidate(c.id)}
+                    onCopyLink={() => handleCopyLink(c)}
+                    colors={colors}
+                    radius={radius}
+                  />
+                ))}
+                {tour.candidates.length === 0 && (
+                  <div style={{ fontSize: 12.5, color: colors.gray400, gridColumn: '1 / -1', textAlign: 'center', padding: '20px 0' }}>
+                    Aucun candidat pour l'instant.
                   </div>
-                )
-              })}
-              {tour.candidates.length === 0 && <div style={{ fontSize: 12, color: colors.gray400 }}>Aucun candidat.</div>}
-            </div>
+                )}
+              </div>
+            )}
           </div>
           )
         })}

@@ -6,6 +6,29 @@ import { getSessionDetail, createVote } from '../../api/vote.js'
 
 const EMPTY_FORM = { label: '', roundsCount: 1, tour1Start: '', tour1End: '', tour2Start: '', tour2End: '' }
 
+function RoundsPicker({ value, onChange, colors, radius }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      {[1, 2].map(n => {
+        const selected = value === n
+        return (
+          <button key={n} type="button" onClick={() => onChange(n)}
+            style={{
+              padding: '12px 14px', borderRadius: radius.md, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+              border: `1.5px solid ${selected ? colors.green : colors.gray200}`,
+              background: selected ? colors.greenLight : colors.white,
+            }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: selected ? colors.greenDark : colors.gray800 }}>{n} tour{n > 1 ? 's' : ''}</div>
+            <div style={{ fontSize: 11, color: colors.gray500, marginTop: 2 }}>
+              {n === 1 ? 'Le plus de voix gagne' : 'Ballottage automatique si besoin'}
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function SessionDetail() {
   const { sessionId } = useParams()
   const { colors } = theme
@@ -65,9 +88,24 @@ export default function SessionDetail() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {session.votes.map(v => (
-            <Link key={v.id} to={`/admin/votes/${v.id}`} className="card" style={{ display: 'flex', justifyContent: 'space-between', textDecoration: 'none', color: 'inherit' }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>{v.label}</span>
-              <span style={{ fontSize: 12, color: colors.gray400 }}>{v.rounds_count} tour{v.rounds_count > 1 ? 's' : ''}</span>
+            <Link key={v.id} to={`/admin/votes/${v.id}`} className="card"
+              style={{ display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'inherit', transition: 'box-shadow 0.15s, transform 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = theme.shadow.lg; e.currentTarget.style.transform = 'translateY(-1px)' }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = ''; e.currentTarget.style.transform = '' }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                background: colors.orangeLight, color: colors.orangeDark,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 12l2 2 4-4" /><circle cx="12" cy="12" r="9" />
+                </svg>
+              </div>
+              <span style={{ fontWeight: 700, fontSize: 14, color: colors.gray900, flex: 1 }}>{v.label}</span>
+              <span className="badge badge-gray">{v.rounds_count} tour{v.rounds_count > 1 ? 's' : ''}</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.gray300} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </Link>
           ))}
         </div>
@@ -75,44 +113,57 @@ export default function SessionDetail() {
 
       {modalOpen && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModalOpen(false)}>
-          <div className="modal" style={{ maxWidth: 520 }}>
+          <div className="modal" style={{ maxWidth: 540 }}>
             <div className="modal-header">
               <div className="modal-title">Nouveau vote</div>
               <button className="modal-close" onClick={() => setModalOpen(false)}>×</button>
             </div>
-            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="form-group">
                 <label className="form-label">Libellé *</label>
                 <input className="form-control" placeholder="ex : Délégué du personnel"
                   value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} autoFocus required />
               </div>
+
               <div className="form-group">
                 <label className="form-label">Nombre de tours *</label>
-                <select className="form-control" value={form.roundsCount}
-                  onChange={e => setForm(f => ({ ...f, roundsCount: Number(e.target.value) }))}>
-                  <option value={1}>1 tour</option>
-                  <option value={2}>2 tours</option>
-                </select>
+                <RoundsPicker value={form.roundsCount} onChange={n => setForm(f => ({ ...f, roundsCount: n }))} colors={colors} radius={theme.radius} />
               </div>
 
-              <div style={{ fontSize: 12, fontWeight: 700, color: colors.gray500, textTransform: 'uppercase', letterSpacing: '.05em' }}>Tour 1</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div className="form-group">
-                  <label className="form-label">Début *</label>
-                  <input type="datetime-local" className="form-control" value={form.tour1Start}
-                    onChange={e => setForm(f => ({ ...f, tour1Start: e.target.value }))} required />
+              <div style={{ background: colors.gray50, borderRadius: theme.radius.lg, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    width: 20, height: 20, borderRadius: '50%', background: colors.green, color: '#fff',
+                    fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>1</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.gray700, textTransform: 'uppercase', letterSpacing: '.03em' }}>Tour 1</span>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Fin *</label>
-                  <input type="datetime-local" className="form-control" value={form.tour1End}
-                    onChange={e => setForm(f => ({ ...f, tour1End: e.target.value }))} required />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Début *</label>
+                    <input type="datetime-local" className="form-control" value={form.tour1Start}
+                      onChange={e => setForm(f => ({ ...f, tour1Start: e.target.value }))} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Fin *</label>
+                    <input type="datetime-local" className="form-control" value={form.tour1End}
+                      onChange={e => setForm(f => ({ ...f, tour1End: e.target.value }))} required />
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: colors.gray400 }}>
+                  Doit démarrer au moins 5 minutes dans le futur, le temps d'ajouter les candidats.
                 </div>
               </div>
 
               {form.roundsCount === 2 && (
-                <>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: colors.gray500, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-                    Tour 2 <span style={{ fontWeight: 400, textTransform: 'none', color: colors.gray400 }}>(déclenché automatiquement)</span>
+                <div style={{ background: colors.orangeLight, borderRadius: theme.radius.lg, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{
+                      width: 20, height: 20, borderRadius: '50%', background: colors.orange, color: '#fff',
+                      fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>2</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.orangeDark, textTransform: 'uppercase', letterSpacing: '.03em' }}>Tour 2</span>
+                    <span style={{ fontSize: 11, color: colors.gray500 }}>(déclenché automatiquement)</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <div className="form-group">
@@ -126,7 +177,7 @@ export default function SessionDetail() {
                         onChange={e => setForm(f => ({ ...f, tour2End: e.target.value }))} required />
                     </div>
                   </div>
-                </>
+                </div>
               )}
 
               <div className="modal-footer">
