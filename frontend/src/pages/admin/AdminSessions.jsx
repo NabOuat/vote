@@ -58,9 +58,28 @@ export default function AdminSessions() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {sessions.map(s => (
             <Link key={s.id} to={`/admin/sessions/${s.id}`} className="card"
-              style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: colors.gray900 }}>{s.label}</div>
-              {s.description && <div style={{ fontSize: 12, color: colors.gray500, marginTop: 4 }}>{s.description}</div>}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'inherit',
+                transition: 'box-shadow 0.15s, transform 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = theme.shadow.lg; e.currentTarget.style.transform = 'translateY(-1px)' }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = ''; e.currentTarget.style.transform = '' }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                background: colors.greenLight, color: colors.greenDark,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: colors.gray900 }}>{s.label}</div>
+                {s.description && <div style={{ fontSize: 12, color: colors.gray500, marginTop: 3 }}>{s.description}</div>}
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.gray300} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </Link>
           ))}
         </div>
