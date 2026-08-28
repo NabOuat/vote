@@ -44,6 +44,7 @@ export function createCandidate(tourId, { fullName, program, photo }) {
   return voteApiFetch(`/admin/tours/${tourId}/candidates`, { method: 'POST', body: form })
 }
 export const deleteCandidate = (candidateId) => voteApiFetch(`/admin/candidates/${candidateId}`, { method: 'DELETE' })
+export const updateCandidateProgram = (candidateId, program) => voteApiFetch(`/admin/candidates/${candidateId}`, { method: 'PUT', body: JSON.stringify({ program }) })
 
 /* ── Admin — votants ──────────────────────────────────────────────── */
 export const importVoters = (voters) => voteApiFetch('/admin/voters/import', { method: 'POST', body: JSON.stringify({ voters }) })

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { getVoteDetail, getVoteResultsAdmin, createCandidate, deleteCandidate, deleteVote, publishTourResults, candidatePhotoUrl, candidateSelfLink } from '../../api/vote.js'
+import { getVoteDetail, getVoteResultsAdmin, createCandidate, deleteCandidate, updateCandidateProgram, deleteVote, publishTourResults, candidatePhotoUrl, candidateSelfLink } from '../../api/vote.js'
 
 const STATUS = {
   UPCOMING: { label: 'À venir', badge: 'badge-gray' },
@@ -51,7 +51,7 @@ function ResultsBars({ ranking, colors }) {
   )
 }
 
-function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, colors, radius }) {
+function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, onEditProgram, colors, radius }) {
   return (
     <div style={{
       padding: '14px 12px 12px', borderRadius: radius.lg, textAlign: 'center', position: 'relative',
@@ -83,10 +83,21 @@ function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, c
             )}
             {candidate.program ? 'Programme reçu' : 'Programme en attente'}
           </div>
-          <button type="button" onClick={onCopyLink}
-            style={{ display: 'block', width: '100%', marginTop: 8, fontSize: 10.5, fontWeight: 600, color: colors.green, background: 'none', border: `1px solid ${colors.gray200}`, borderRadius: 20, padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit' }}>
-            Copier le lien candidat
-          </button>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <button type="button" onClick={onEditProgram}
+              style={{ flex: 1, fontSize: 10.5, fontWeight: 600, color: colors.gray700, background: colors.gray100, border: 'none', borderRadius: 20, padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              {candidate.program ? 'Modifier' : 'Saisir'} le programme
+            </button>
+            <button type="button" onClick={onCopyLink} title="Copier le lien candidat"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.green,
+                background: 'none', border: `1px solid ${colors.gray200}`, borderRadius: 20, padding: '4px 9px', cursor: 'pointer',
+              }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            </button>
+          </div>
         </>
       )}
     </div>
@@ -104,6 +115,9 @@ export default function VoteManage() {
   const [candidateModal, setCandidateModal] = useState(null) // tourId
   const [form, setForm] = useState({ fullName: '', program: '', photo: null })
   const [saving, setSaving] = useState(false)
+  const [programModal, setProgramModal] = useState(null) // candidate
+  const [programText, setProgramText] = useState('')
+  const [savingProgram, setSavingProgram] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -153,6 +167,26 @@ export default function VoteManage() {
       await load()
     } catch (err) {
       toast.error(err.message ?? 'Erreur.', 'Erreur')
+    }
+  }
+
+  function openProgramModal(candidate) {
+    setProgramText(candidate.program ?? '')
+    setProgramModal(candidate)
+  }
+
+  async function handleSaveProgram(e) {
+    e.preventDefault()
+    setSavingProgram(true)
+    try {
+      await updateCandidateProgram(programModal.id, programText)
+      toast.success('Programme enregistré.', 'Vote')
+      setProgramModal(null)
+      await load()
+    } catch (err) {
+      toast.error(err.message ?? 'Erreur.', 'Erreur')
+    } finally {
+      setSavingProgram(false)
     }
   }
 
@@ -241,6 +275,7 @@ export default function VoteManage() {
                     canEdit={tour.status === 'UPCOMING'}
                     onDelete={() => handleDeleteCandidate(c.id)}
                     onCopyLink={() => handleCopyLink(c)}
+                    onEditProgram={() => openProgramModal(c)}
                     colors={colors}
                     radius={radius}
                   />
@@ -281,6 +316,37 @@ export default function VoteManage() {
                 <button type="button" className="btn btn-secondary" onClick={() => setCandidateModal(null)}>Annuler</button>
                 <button type="submit" className="btn btn-primary" disabled={saving || !form.fullName.trim() || !form.photo}>
                   {saving ? 'Ajout…' : 'Ajouter'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {programModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && !savingProgram && setProgramModal(null)}>
+          <div className="modal" style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <div className="modal-title">Programme — {programModal.full_name}</div>
+              <button className="modal-close" onClick={() => setProgramModal(null)} disabled={savingProgram}>×</button>
+            </div>
+            <form onSubmit={handleSaveProgram} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <img src={candidatePhotoUrl(programModal.photo_path)} alt={programModal.full_name}
+                  style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', background: colors.gray100, flexShrink: 0 }} />
+                <div style={{ fontSize: 11.5, color: colors.gray500 }}>
+                  Le candidat peut aussi le saisir lui-même via son lien personnel — cette saisie écrase la sienne.
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Programme</label>
+                <textarea className="form-control" rows={7} value={programText} onChange={e => setProgramText(e.target.value)}
+                  placeholder="Présentation et priorités du candidat…" autoFocus />
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setProgramModal(null)} disabled={savingProgram}>Annuler</button>
+                <button type="submit" className="btn btn-primary" disabled={savingProgram}>
+                  {savingProgram ? 'Enregistrement…' : 'Enregistrer'}
                 </button>
               </div>
             </form>

@@ -201,6 +201,24 @@ async function handleCreateCandidate(req, res) {
   res.status(201).json(candidate)
 }
 
+/** L'admin peut aussi renseigner/corriger le programme, en plus du lien
+ * d'auto-saisie donné au candidat (utile quand le candidat n'a pas Internet,
+ * ou pour corriger une coquille) — même contrainte temporelle : verrouillé
+ * une fois le tour ouvert, pour ne jamais modifier un programme déjà vu par
+ * des électeurs. */
+adminRouter.put('/candidates/:candidateId', asyncHandler(async (req, res) => {
+  const { rows: [candidate] } = await db.execute({ sql: 'SELECT * FROM candidates WHERE id = ?', args: [req.params.candidateId] })
+  if (!candidate) return res.status(404).json({ message: 'Candidat introuvable.' })
+  const { rows: [tour] } = await db.execute({ sql: 'SELECT * FROM tours WHERE id = ?', args: [candidate.tour_id] })
+  if (tour.status !== 'UPCOMING') {
+    return res.status(409).json({ message: 'Impossible de modifier le programme une fois le tour ouvert.' })
+  }
+  const { program } = req.body ?? {}
+  await db.execute({ sql: 'UPDATE candidates SET program = ? WHERE id = ?', args: [program?.trim() || null, candidate.id] })
+  const { rows: [updated] } = await db.execute({ sql: 'SELECT * FROM candidates WHERE id = ?', args: [candidate.id] })
+  res.json(updated)
+}))
+
 adminRouter.delete('/candidates/:candidateId', asyncHandler(async (req, res) => {
   const { rows: [candidate] } = await db.execute({ sql: 'SELECT * FROM candidates WHERE id = ?', args: [req.params.candidateId] })
   if (!candidate) return res.status(404).json({ message: 'Candidat introuvable.' })
