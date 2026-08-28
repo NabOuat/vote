@@ -40,5 +40,7 @@ app.use('/api', voterRouter)
 
 app.use((err, req, res, next) => {
   console.error(err)
-  res.status(500).json({ message: 'Erreur interne du serveur.' })
+  // TEMP DEBUG : détail de l'erreur exposé le temps de diagnostiquer le 500
+  // sur la création de candidat en prod — à retirer une fois résolu.
+  res.status(500).json({ message: 'Erreur interne du serveur.', debug: String(err?.stack ?? err) })
 })
