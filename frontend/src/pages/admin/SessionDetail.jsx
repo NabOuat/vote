@@ -138,7 +138,7 @@ export default function SessionDetail() {
                   }}>1</span>
                   <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.gray700, textTransform: 'uppercase', letterSpacing: '.03em' }}>Tour 1</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="date-range-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div className="form-group">
                     <label className="form-label">Début *</label>
                     <input type="datetime-local" className="form-control" value={form.tour1Start}
@@ -165,7 +165,7 @@ export default function SessionDetail() {
                     <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.orangeDark, textTransform: 'uppercase', letterSpacing: '.03em' }}>Tour 2</span>
                     <span style={{ fontSize: 11, color: colors.gray500 }}>(déclenché automatiquement)</span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="date-range-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <div className="form-group">
                       <label className="form-label">Début *</label>
                       <input type="datetime-local" className="form-control" value={form.tour2Start}

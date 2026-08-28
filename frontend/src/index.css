@@ -68,6 +68,10 @@
   .vote-header-logout-text { display: none; }
   .vote-header-logout-icon { display: inline-flex !important; }
   .vote-header-logout { padding: 8px !important; }
+
+  /* Les champs datetime-local ont une largeur intrinsèque trop grande pour
+     tenir à deux par ligne sur un téléphone (le second était rogné). */
+  .date-range-grid { grid-template-columns: 1fr !important; }
 }
 
 @media (max-width: 420px) {
