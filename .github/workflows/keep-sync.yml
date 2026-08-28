@@ -1,0 +1,18 @@
+name: Keep vote sync alive
+
+# Aucun scheduler en tâche de fond n'existe en serverless (Vercel) — les
+# transitions de statut des tours (UPCOMING→ONGOING→CLOSED) ne se recalculent
+# qu'à la requête (voir server/src/services/tourSync.service.js). Sans trafic
+# humain pendant une fenêtre de vote, rien ne se passerait jusqu'à la
+# prochaine visite. Ce ping régulier remplace le cron absent, gratuitement.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /api/health (déclenche la synchronisation des tours)
+        run: curl -sf --max-time 20 https://vote-olive.vercel.app/api/health
