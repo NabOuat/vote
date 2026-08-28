@@ -6,12 +6,14 @@ import { randomUUID } from 'node:crypto'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-// Sans variable d'env → fichier SQLite local (dev). En prod, VOTE_DB_URL
-// pointe vers une base Turso (libsql://...) — même client, même API, aucun
-// autre changement de code entre les deux environnements.
+// Sans variable d'env → fichier SQLite local (dev). En prod, l'intégration
+// Turso de Vercel injecte TURSO_DATABASE_URL/TURSO_AUTH_TOKEN (on garde
+// VOTE_DB_URL/VOTE_DB_TOKEN en repli, pour un nommage manuel si besoin) —
+// même client, même API, aucun autre changement de code entre les deux
+// environnements.
 export const db = createClient({
-  url: process.env.VOTE_DB_URL ?? `file:${join(__dirname, '..', 'vote.db')}`,
-  authToken: process.env.VOTE_DB_TOKEN,
+  url: process.env.TURSO_DATABASE_URL ?? process.env.VOTE_DB_URL ?? `file:${join(__dirname, '..', 'vote.db')}`,
+  authToken: process.env.TURSO_AUTH_TOKEN ?? process.env.VOTE_DB_TOKEN,
 })
 
 /** Ajoute une colonne si elle n'existe pas déjà — évite un vrai système de

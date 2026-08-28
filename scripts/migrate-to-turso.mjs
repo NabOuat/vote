@@ -3,8 +3,8 @@
  * vers une base Turso + Vercel Blob. À exécuter UNE SEULE FOIS, en local,
  * avec les vraies variables d'environnement de production :
  *
- *   VOTE_DB_URL=libsql://<ta-base>.turso.io \
- *   VOTE_DB_TOKEN=<token turso> \
+ *   TURSO_DATABASE_URL=libsql://<ta-base>.turso.io \
+ *   TURSO_AUTH_TOKEN=<token turso> \
  *   BLOB_READ_WRITE_TOKEN=<token vercel blob> \
  *   node scripts/migrate-to-turso.mjs
  *
@@ -19,10 +19,10 @@ import { dirname, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-const VOTE_DB_URL = process.env.VOTE_DB_URL
-const VOTE_DB_TOKEN = process.env.VOTE_DB_TOKEN
+const VOTE_DB_URL = process.env.TURSO_DATABASE_URL ?? process.env.VOTE_DB_URL
+const VOTE_DB_TOKEN = process.env.TURSO_AUTH_TOKEN ?? process.env.VOTE_DB_TOKEN
 if (!VOTE_DB_URL || !VOTE_DB_TOKEN) {
-  console.error('VOTE_DB_URL et VOTE_DB_TOKEN (base Turso cible) sont requis.')
+  console.error('TURSO_DATABASE_URL et TURSO_AUTH_TOKEN (base Turso cible) sont requis.')
   process.exit(1)
 }
 if (!process.env.BLOB_READ_WRITE_TOKEN) {

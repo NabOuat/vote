@@ -35,8 +35,8 @@ Le frontend proxifie `/api/*` vers `http://localhost:4300` en dev
    par défaut (`./`) — `api/` et `frontend/` sont tous les deux à la racine.
 2. **Storage** → ajouter une base **Turso** et un store **Vercel Blob** depuis
    l'onglet Storage/Marketplace du projet : les variables d'environnement
-   correspondantes (`VOTE_DB_URL`/`VOTE_DB_TOKEN` selon le nommage de
-   l'intégration, `BLOB_READ_WRITE_TOKEN`) sont ajoutées automatiquement.
+   correspondantes (`TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`,
+   `BLOB_READ_WRITE_TOKEN`) sont ajoutées automatiquement.
 3. **Variable manuelle obligatoire** : `VOTE_JWT_SECRET` — une vraie valeur
    aléatoire longue.
 4. **Build** : `vercel.json` définit déjà `installCommand`/`buildCommand`/
@@ -50,8 +50,8 @@ Les données réelles existantes (comptes admin/votants/candidats en local dans
 vers Turso/Blob :
 
 ```bash
-VOTE_DB_URL=libsql://<ta-base>.turso.io \
-VOTE_DB_TOKEN=<token turso de prod> \
+TURSO_DATABASE_URL=libsql://<ta-base>.turso.io \
+TURSO_AUTH_TOKEN=<token turso de prod> \
 BLOB_READ_WRITE_TOKEN=<token vercel blob de prod> \
 npm run migrate:turso
 ```
