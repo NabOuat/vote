@@ -33,14 +33,6 @@ app.use(async (req, res, next) => {
 })
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
-// TEMP DEBUG : présence (pas la valeur) des variables d'env attendues — à retirer une fois résolu.
-app.get('/api/debug-env', (req, res) => res.json({
-  BLOB_READ_WRITE_TOKEN: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
-  TURSO_DATABASE_URL: Boolean(process.env.TURSO_DATABASE_URL),
-  TURSO_AUTH_TOKEN: Boolean(process.env.TURSO_AUTH_TOKEN),
-  VOTE_JWT_SECRET: Boolean(process.env.VOTE_JWT_SECRET),
-  keysWithBlob: Object.keys(process.env).filter(k => k.includes('BLOB')),
-}))
 app.use('/api/candidates', candidateRouter)
 app.use('/api/auth', authRouter)
 app.use('/api/admin', adminRouter)
@@ -48,7 +40,5 @@ app.use('/api', voterRouter)
 
 app.use((err, req, res, next) => {
   console.error(err)
-  // TEMP DEBUG : détail de l'erreur exposé le temps de diagnostiquer le 500
-  // sur la création de candidat en prod — à retirer une fois résolu.
-  res.status(500).json({ message: 'Erreur interne du serveur.', debug: String(err?.stack ?? err) })
+  res.status(500).json({ message: 'Erreur interne du serveur.' })
 })
