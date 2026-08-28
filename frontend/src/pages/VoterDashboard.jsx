@@ -32,6 +32,97 @@ function TourResults({ results, colors }) {
   )
 }
 
+function CandidateCard({ candidate, selected, onSelect, onViewProgram }) {
+  const { colors, radius } = theme
+  return (
+    <div
+      onClick={onSelect}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '18px 14px 14px',
+        borderRadius: radius.lg, cursor: 'pointer', fontFamily: 'inherit',
+        border: `2px solid ${selected ? colors.green : colors.gray200}`,
+        background: selected ? colors.greenLight : colors.white,
+        boxShadow: selected ? '0 6px 18px rgba(33,168,99,0.2)' : theme.shadow.sm,
+        transform: selected ? 'translateY(-2px)' : 'none',
+        transition: 'all 0.18s',
+        position: 'relative',
+      }}>
+      {selected && (
+        <div style={{
+          position: 'absolute', top: 10, right: 10, width: 22, height: 22, borderRadius: '50%',
+          background: colors.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 2px 6px rgba(33,168,99,0.4)',
+        }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+        </div>
+      )}
+      <img src={candidatePhotoUrl(candidate.photo_path)} alt={candidate.full_name}
+        style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', background: colors.gray100, border: `3px solid ${colors.white}`, boxShadow: theme.shadow.md }} />
+      <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.gray900, textAlign: 'center', lineHeight: 1.35 }}>{candidate.full_name}</span>
+      <button
+        type="button"
+        onClick={e => { e.stopPropagation(); onViewProgram() }}
+        style={{
+          fontSize: 11, fontWeight: 600, color: colors.greenDark,
+          background: 'rgba(33,168,99,0.1)', border: 'none', borderRadius: 999,
+          padding: '4px 11px', display: 'inline-flex', alignItems: 'center', gap: 4,
+        }}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" />
+        </svg>
+        Voir le programme
+      </button>
+    </div>
+  )
+}
+
+function CandidateDetail({ candidate, selected, onBack, onSelect }) {
+  const { colors, radius } = theme
+  return (
+    <div style={{ animation: 'fadeIn 0.15s ease' }}>
+      <button type="button" onClick={onBack} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 600,
+        color: colors.gray500, background: 'none', border: 'none', padding: 0, marginBottom: 16,
+      }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        Retour à la liste des candidats
+      </button>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
+        <img src={candidatePhotoUrl(candidate.photo_path)} alt={candidate.full_name}
+          style={{ width: 68, height: 68, borderRadius: '50%', objectFit: 'cover', background: colors.gray100, border: `3px solid ${colors.white}`, boxShadow: theme.shadow.md, flexShrink: 0 }} />
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: colors.gray900 }}>{candidate.full_name}</div>
+          <div style={{ fontSize: 12, color: colors.gray400, marginTop: 2 }}>Candidat</div>
+        </div>
+      </div>
+
+      <div style={{
+        background: colors.gray50, border: `1px solid ${colors.gray100}`, borderRadius: radius.lg,
+        padding: '16px 18px', fontSize: 13.5, color: colors.gray700, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+        minHeight: 80,
+      }}>
+        {candidate.program?.trim() ? candidate.program : (
+          <span style={{ color: colors.gray400, fontStyle: 'italic' }}>Ce candidat n'a pas encore renseigné de programme.</span>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={onSelect}
+        className={selected ? 'btn btn-primary' : 'btn btn-secondary'}
+        style={{ width: '100%', justifyContent: 'center', marginTop: 18 }}>
+        {selected ? (
+          <>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+            Candidat sélectionné
+          </>
+        ) : 'Choisir ce candidat'}
+      </button>
+    </div>
+  )
+}
+
 export default function VoterDashboard() {
   const { colors, radius } = theme
   const toast = useToast()
@@ -39,6 +130,7 @@ export default function VoterDashboard() {
   const [loading, setLoading] = useState(true)
   const [ballotModal, setBallotModal] = useState(null) // { tourId, candidates }
   const [selectedCandidate, setSelectedCandidate] = useState(null)
+  const [viewingCandidate, setViewingCandidate] = useState(null)
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -56,7 +148,13 @@ export default function VoterDashboard() {
 
   function openBallot(tour) {
     setSelectedCandidate(null)
+    setViewingCandidate(null)
     setBallotModal(tour)
+  }
+
+  function closeBallot() {
+    setBallotModal(null)
+    setViewingCandidate(null)
   }
 
   async function submitBallot() {
@@ -65,7 +163,7 @@ export default function VoterDashboard() {
     try {
       await castBallot(ballotModal.tourId, selectedCandidate)
       toast.success('Votre vote a été enregistré.', 'Merci !')
-      setBallotModal(null)
+      closeBallot()
       await load()
     } catch (err) {
       toast.error(err.message ?? 'Erreur lors du vote.', 'Erreur')
@@ -136,49 +234,43 @@ export default function VoterDashboard() {
       ))}
 
       {ballotModal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && !saving && setBallotModal(null)}>
-          <div className="modal" style={{ maxWidth: 560 }}>
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && !saving && closeBallot()}>
+          <div className="modal" style={{ maxWidth: 580 }}>
             <div className="modal-header">
-              <div className="modal-title">Tour {ballotModal.tourNumber} — choisissez un candidat</div>
-              <button className="modal-close" onClick={() => setBallotModal(null)} disabled={saving}>×</button>
+              <div className="modal-title">
+                {viewingCandidate ? 'Programme du candidat' : `Tour ${ballotModal.tourNumber} — choisissez un candidat`}
+              </div>
+              <button className="modal-close" onClick={closeBallot} disabled={saving}>×</button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 12 }}>
-              {ballotModal.candidates.map(c => {
-                const selected = selectedCandidate === c.id
-                return (
-                  <button key={c.id} type="button" onClick={() => setSelectedCandidate(c.id)}
-                    style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9, padding: '16px 12px',
-                      borderRadius: radius.lg, cursor: 'pointer', fontFamily: 'inherit',
-                      border: `2px solid ${selected ? colors.green : colors.gray200}`,
-                      background: selected ? colors.greenLight : colors.white,
-                      boxShadow: selected ? '0 4px 14px rgba(33,168,99,0.18)' : 'none',
-                      transform: selected ? 'translateY(-1px)' : 'none',
-                      transition: 'all 0.15s',
-                      position: 'relative',
-                    }}>
-                    {selected && (
-                      <div style={{
-                        position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: '50%',
-                        background: colors.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
-                      </div>
-                    )}
-                    <img src={candidatePhotoUrl(c.photo_path)} alt={c.full_name}
-                      style={{ width: 76, height: 76, borderRadius: '50%', objectFit: 'cover', background: colors.gray100, border: `2px solid ${colors.white}`, boxShadow: theme.shadow.sm }} />
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.gray900, textAlign: 'center', lineHeight: 1.3 }}>{c.full_name}</span>
-                    {c.program && <span style={{ fontSize: 11, color: colors.gray500, textAlign: 'center' }}>{c.program}</span>}
+
+            {viewingCandidate ? (
+              <CandidateDetail
+                candidate={viewingCandidate}
+                selected={selectedCandidate === viewingCandidate.id}
+                onBack={() => setViewingCandidate(null)}
+                onSelect={() => { setSelectedCandidate(viewingCandidate.id); setViewingCandidate(null) }}
+              />
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 14 }}>
+                  {ballotModal.candidates.map(c => (
+                    <CandidateCard
+                      key={c.id}
+                      candidate={c}
+                      selected={selectedCandidate === c.id}
+                      onSelect={() => setSelectedCandidate(c.id)}
+                      onViewProgram={() => setViewingCandidate(c)}
+                    />
+                  ))}
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={closeBallot} disabled={saving}>Annuler</button>
+                  <button className="btn btn-primary" onClick={submitBallot} disabled={!selectedCandidate || saving}>
+                    {saving ? 'Envoi…' : 'Confirmer mon vote'}
                   </button>
-                )
-              })}
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setBallotModal(null)} disabled={saving}>Annuler</button>
-              <button className="btn btn-primary" onClick={submitBallot} disabled={!selectedCandidate || saving}>
-                {saving ? 'Envoi…' : 'Confirmer mon vote'}
-              </button>
-            </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
