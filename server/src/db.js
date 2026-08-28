@@ -47,6 +47,10 @@ async function runMigrations() {
       throw err
     }
   }
+
+  // 003 — poste occupé, affiché à côté du nom (votants et candidats).
+  await ensureColumn('users', 'poste', 'TEXT')
+  await ensureColumn('candidates', 'poste', 'TEXT')
 }
 
 let migrated = null

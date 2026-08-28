@@ -20,7 +20,7 @@ voterRouter.get('/me/votes', asyncHandler(async (req, res) => {
     const { rows: tours } = await db.execute({ sql: 'SELECT * FROM tours WHERE vote_id = ? ORDER BY tour_number', args: [vote.id] })
     const toursPayload = await Promise.all(tours.map(async (t) => {
       const { rows: candidates } = await db.execute({
-        sql: 'SELECT id, full_name, photo_path, program FROM candidates WHERE tour_id = ?',
+        sql: 'SELECT id, full_name, poste, photo_path, program FROM candidates WHERE tour_id = ?',
         args: [t.id],
       })
       const base = {

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { getVoteDetail, getVoteResultsAdmin, createCandidate, deleteCandidate, updateCandidateProgram, deleteVote, publishTourResults, candidatePhotoUrl, candidateSelfLink } from '../../api/vote.js'
+import { getVoteDetail, getVoteResultsAdmin, createCandidate, deleteCandidate, updateCandidateInfo, deleteVote, publishTourResults, candidatePhotoUrl, candidateSelfLink } from '../../api/vote.js'
 
 const STATUS = {
   UPCOMING: { label: 'À venir', badge: 'badge-gray' },
@@ -31,7 +31,10 @@ function ResultsBars({ ranking, colors }) {
               style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', background: colors.gray100, flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
-                <span style={{ fontWeight: 700, color: colors.gray800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.full_name}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontWeight: 700, color: colors.gray800 }}>{r.full_name}</span>
+                  {r.poste && <span style={{ color: colors.gray400, fontWeight: 500 }}> · {r.poste}</span>}
+                </span>
                 <span style={{ color: colors.gray500, fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>
                   {r.votes} voix{total > 0 && ` · ${Math.round((r.votes / total) * 100)}%`}
                 </span>
@@ -69,6 +72,7 @@ function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, o
       <img src={candidatePhotoUrl(candidate.photo_path)} alt={candidate.full_name}
         style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', background: colors.gray100, boxShadow: theme.shadow.sm }} />
       <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 8, color: colors.gray900 }}>{candidate.full_name}</div>
+      {candidate.poste && <div style={{ fontSize: 11, color: colors.gray400, marginTop: 1 }}>{candidate.poste}</div>}
       {votes != null && <div style={{ fontSize: 11.5, color: colors.gray500, marginTop: 2 }}>{votes} voix</div>}
       {canEdit && (
         <>
@@ -86,7 +90,7 @@ function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, o
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
             <button type="button" onClick={onEditProgram}
               style={{ flex: 1, fontSize: 10.5, fontWeight: 600, color: colors.gray700, background: colors.gray100, border: 'none', borderRadius: 20, padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit' }}>
-              {candidate.program ? 'Modifier' : 'Saisir'} le programme
+              Poste / programme
             </button>
             <button type="button" onClick={onCopyLink} title="Copier le lien candidat"
               style={{
@@ -113,10 +117,11 @@ export default function VoteManage() {
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(true)
   const [candidateModal, setCandidateModal] = useState(null) // tourId
-  const [form, setForm] = useState({ fullName: '', program: '', photo: null })
+  const [form, setForm] = useState({ fullName: '', poste: '', program: '', photo: null })
   const [saving, setSaving] = useState(false)
   const [programModal, setProgramModal] = useState(null) // candidate
   const [programText, setProgramText] = useState('')
+  const [posteText, setPosteText] = useState('')
   const [savingProgram, setSavingProgram] = useState(false)
 
   const load = useCallback(async () => {
@@ -141,7 +146,7 @@ export default function VoteManage() {
     try {
       await createCandidate(candidateModal, form)
       toast.success('Candidat ajouté.', 'Vote')
-      setForm({ fullName: '', program: '', photo: null })
+      setForm({ fullName: '', poste: '', program: '', photo: null })
       setCandidateModal(null)
       await load()
     } catch (err) {
@@ -172,6 +177,7 @@ export default function VoteManage() {
 
   function openProgramModal(candidate) {
     setProgramText(candidate.program ?? '')
+    setPosteText(candidate.poste ?? '')
     setProgramModal(candidate)
   }
 
@@ -179,8 +185,8 @@ export default function VoteManage() {
     e.preventDefault()
     setSavingProgram(true)
     try {
-      await updateCandidateProgram(programModal.id, programText)
-      toast.success('Programme enregistré.', 'Vote')
+      await updateCandidateInfo(programModal.id, { program: programText, poste: posteText })
+      toast.success('Informations enregistrées.', 'Vote')
       setProgramModal(null)
       await load()
     } catch (err) {
@@ -305,6 +311,10 @@ export default function VoteManage() {
                 <input className="form-control" value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))} autoFocus required />
               </div>
               <div className="form-group">
+                <label className="form-label">Poste (optionnel)</label>
+                <input className="form-control" placeholder="ex : Comptable" value={form.poste} onChange={e => setForm(f => ({ ...f, poste: e.target.value }))} />
+              </div>
+              <div className="form-group">
                 <label className="form-label">Programme (optionnel)</label>
                 <textarea className="form-control" rows={2} value={form.program} onChange={e => setForm(f => ({ ...f, program: e.target.value }))} />
               </div>
@@ -327,7 +337,7 @@ export default function VoteManage() {
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && !savingProgram && setProgramModal(null)}>
           <div className="modal" style={{ maxWidth: 520 }}>
             <div className="modal-header">
-              <div className="modal-title">Programme — {programModal.full_name}</div>
+              <div className="modal-title">{programModal.full_name}</div>
               <button className="modal-close" onClick={() => setProgramModal(null)} disabled={savingProgram}>×</button>
             </div>
             <form onSubmit={handleSaveProgram} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -339,9 +349,13 @@ export default function VoteManage() {
                 </div>
               </div>
               <div className="form-group">
+                <label className="form-label">Poste</label>
+                <input className="form-control" placeholder="ex : Comptable" value={posteText} onChange={e => setPosteText(e.target.value)} autoFocus />
+              </div>
+              <div className="form-group">
                 <label className="form-label">Programme</label>
-                <textarea className="form-control" rows={7} value={programText} onChange={e => setProgramText(e.target.value)}
-                  placeholder="Présentation et priorités du candidat…" autoFocus />
+                <textarea className="form-control" rows={6} value={programText} onChange={e => setProgramText(e.target.value)}
+                  placeholder="Présentation et priorités du candidat…" />
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setProgramModal(null)} disabled={savingProgram}>Annuler</button>

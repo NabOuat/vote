@@ -36,15 +36,16 @@ export const deleteSession        = (sessionId) => voteApiFetch(`/admin/sessions
 export const deleteVote           = (voteId) => voteApiFetch(`/admin/votes/${voteId}`, { method: 'DELETE' })
 
 /* ── Admin — candidats ────────────────────────────────────────────── */
-export function createCandidate(tourId, { fullName, program, photo }) {
+export function createCandidate(tourId, { fullName, poste, program, photo }) {
   const form = new FormData()
   form.append('fullName', fullName)
+  if (poste) form.append('poste', poste)
   if (program) form.append('program', program)
   form.append('photo', photo)
   return voteApiFetch(`/admin/tours/${tourId}/candidates`, { method: 'POST', body: form })
 }
 export const deleteCandidate = (candidateId) => voteApiFetch(`/admin/candidates/${candidateId}`, { method: 'DELETE' })
-export const updateCandidateProgram = (candidateId, program) => voteApiFetch(`/admin/candidates/${candidateId}`, { method: 'PUT', body: JSON.stringify({ program }) })
+export const updateCandidateInfo = (candidateId, { program, poste }) => voteApiFetch(`/admin/candidates/${candidateId}`, { method: 'PUT', body: JSON.stringify({ program, poste }) })
 
 /* ── Admin — votants ──────────────────────────────────────────────── */
 export const importVoters = (voters) => voteApiFetch('/admin/voters/import', { method: 'POST', body: JSON.stringify({ voters }) })

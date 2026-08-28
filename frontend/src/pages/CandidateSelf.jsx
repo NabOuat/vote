@@ -58,7 +58,10 @@ export default function CandidateSelf() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
               <img src={candidatePhotoUrl(candidate.photoPath)} alt={candidate.fullName}
                 style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', background: colors.gray100 }} />
-              <div style={{ fontSize: 18, fontWeight: 800, color: colors.gray900 }}>{candidate.fullName}</div>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: colors.gray900 }}>{candidate.fullName}</div>
+                {candidate.poste && <div style={{ fontSize: 12.5, color: colors.gray500, marginTop: 2 }}>{candidate.poste}</div>}
+              </div>
             </div>
 
             {!candidate.editable ? (

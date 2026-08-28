@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('ADMIN_VOTE','VOTER')),
   full_name TEXT NOT NULL,
+  poste TEXT,
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS candidates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tour_id INTEGER NOT NULL REFERENCES tours(id) ON DELETE CASCADE,
   full_name TEXT NOT NULL,
+  poste TEXT,
   photo_path TEXT NOT NULL,
   program TEXT,
   -- Jeton unique permettant au candidat lui-même de renseigner son programme

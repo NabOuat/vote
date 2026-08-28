@@ -27,9 +27,9 @@ async function qualifyNextTour(closedTour) {
   try {
     for (const q of qualifiers) {
       await tx.execute({
-        sql: `INSERT INTO candidates (tour_id, full_name, photo_path, program, qualified_from_candidate_id)
-              VALUES (?, ?, ?, ?, ?)`,
-        args: [tour2.id, q.full_name, q.photo_path, q.program, q.id],
+        sql: `INSERT INTO candidates (tour_id, full_name, poste, photo_path, program, qualified_from_candidate_id)
+              VALUES (?, ?, ?, ?, ?, ?)`,
+        args: [tour2.id, q.full_name, q.poste, q.photo_path, q.program, q.id],
       })
     }
     await tx.commit()

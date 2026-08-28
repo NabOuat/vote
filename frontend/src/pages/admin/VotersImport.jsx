@@ -4,11 +4,11 @@ import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { importVoters } from '../../api/vote.js'
 
-/** Format attendu, une ligne par votant : identifiant;nom complet;mot de passe */
+/** Format attendu, une ligne par votant : identifiant;nom complet;mot de passe;poste (le poste est optionnel) */
 function parseCsv(text) {
   return text.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
-    const [username, fullName, password] = line.split(';').map(s => s?.trim())
-    return { username, fullName, password }
+    const [username, fullName, password, poste] = line.split(';').map(s => s?.trim())
+    return { username, fullName, password, poste: poste || undefined }
   })
 }
 
@@ -45,7 +45,7 @@ export default function VotersImport() {
         <div>
           <Link to="/admin" style={{ fontSize: 12, color: colors.gray400 }}>← Sessions</Link>
           <div className="page-title" style={{ marginTop: 4 }}>Importer des votants</div>
-          <div className="page-sub">Un votant par ligne : identifiant;nom complet;mot de passe</div>
+          <div className="page-sub">Un votant par ligne : identifiant;nom complet;mot de passe;poste (poste optionnel)</div>
         </div>
       </div>
 
@@ -54,7 +54,7 @@ export default function VotersImport() {
           <textarea
             className="form-control"
             rows={10}
-            placeholder={'jdupont;Jean Dupont;MotDePasse123\nmmartin;Marie Martin;MotDePasse456'}
+            placeholder={'jdupont;Jean Dupont;MotDePasse123;Comptable\nmmartin;Marie Martin;MotDePasse456;Chef de projet'}
             value={raw}
             onChange={e => setRaw(e.target.value)}
             style={{ fontFamily: 'monospace', fontSize: 13 }}

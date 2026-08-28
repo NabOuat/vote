@@ -27,6 +27,7 @@ candidateRouter.get('/:candidateId/self', asyncHandler(async (req, res) => {
   res.json({
     id: candidate.id,
     fullName: candidate.full_name,
+    poste: candidate.poste,
     photoPath: candidate.photo_path,
     program: candidate.program,
     editable: tour?.status === 'UPCOMING',

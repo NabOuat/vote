@@ -3,7 +3,7 @@ import { db } from '../db.js'
 /** Dépouillement d'un tour : liste des candidats avec leur nombre de voix, triée. */
 export async function tallyTour(tourId) {
   const [{ rows: candidates }, { rows: counts }] = await Promise.all([
-    db.execute({ sql: 'SELECT id, full_name, photo_path, program FROM candidates WHERE tour_id = ?', args: [tourId] }),
+    db.execute({ sql: 'SELECT id, full_name, poste, photo_path, program FROM candidates WHERE tour_id = ?', args: [tourId] }),
     db.execute({ sql: 'SELECT candidate_id, COUNT(*) as votes FROM ballots WHERE tour_id = ? GROUP BY candidate_id', args: [tourId] }),
   ])
   const countMap = new Map(counts.map((c) => [c.candidate_id, Number(c.votes)]))

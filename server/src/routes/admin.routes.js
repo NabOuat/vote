@@ -158,7 +158,7 @@ async function getVoteDetail(voteId) {
   const { rows: tours } = await db.execute({ sql: 'SELECT * FROM tours WHERE vote_id = ? ORDER BY tour_number', args: [voteId] })
   const toursWithCandidates = await Promise.all(tours.map(async (t) => {
     const { rows: candidates } = await db.execute({
-      sql: 'SELECT id, full_name, photo_path, program, edit_token FROM candidates WHERE tour_id = ?',
+      sql: 'SELECT id, full_name, poste, photo_path, program, edit_token FROM candidates WHERE tour_id = ?',
       args: [t.id],
     })
     return { ...t, candidates }
@@ -186,15 +186,15 @@ async function handleCreateCandidate(req, res) {
   if (tour.status !== 'UPCOMING') {
     return res.status(409).json({ message: 'Impossible de modifier les candidats une fois le tour ouvert.' })
   }
-  const { fullName, program } = req.body ?? {}
+  const { fullName, poste, program } = req.body ?? {}
   if (!fullName?.trim()) return res.status(400).json({ message: 'Le nom du candidat est requis.' })
   if (!req.file) return res.status(400).json({ message: 'La photo est obligatoire.' })
 
   const photoPath = await storeCandidatePhoto(req.file)
   const editToken = randomUUID()
   const result = await db.execute({
-    sql: 'INSERT INTO candidates (tour_id, full_name, photo_path, program, edit_token) VALUES (?, ?, ?, ?, ?)',
-    args: [tour.id, fullName.trim(), photoPath, program?.trim() || null, editToken],
+    sql: 'INSERT INTO candidates (tour_id, full_name, poste, photo_path, program, edit_token) VALUES (?, ?, ?, ?, ?, ?)',
+    args: [tour.id, fullName.trim(), poste?.trim() || null, photoPath, program?.trim() || null, editToken],
   })
 
   const { rows: [candidate] } = await db.execute({ sql: 'SELECT * FROM candidates WHERE id = ?', args: [result.lastInsertRowid] })
@@ -213,8 +213,11 @@ adminRouter.put('/candidates/:candidateId', asyncHandler(async (req, res) => {
   if (tour.status !== 'UPCOMING') {
     return res.status(409).json({ message: 'Impossible de modifier le programme une fois le tour ouvert.' })
   }
-  const { program } = req.body ?? {}
-  await db.execute({ sql: 'UPDATE candidates SET program = ? WHERE id = ?', args: [program?.trim() || null, candidate.id] })
+  const { program, poste } = req.body ?? {}
+  await db.execute({
+    sql: 'UPDATE candidates SET program = ?, poste = ? WHERE id = ?',
+    args: [program?.trim() || null, poste !== undefined ? (poste?.trim() || null) : candidate.poste, candidate.id],
+  })
   const { rows: [updated] } = await db.execute({ sql: 'SELECT * FROM candidates WHERE id = ?', args: [candidate.id] })
   res.json(updated)
 }))
@@ -247,8 +250,8 @@ adminRouter.post('/voters/import', asyncHandler(async (req, res) => {
     try {
       const hash = bcrypt.hashSync(v.password, 10)
       const result = await db.execute({
-        sql: 'INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, ?, ?)',
-        args: [v.username.trim(), hash, 'VOTER', v.fullName.trim()],
+        sql: 'INSERT INTO users (username, password_hash, role, full_name, poste) VALUES (?, ?, ?, ?, ?)',
+        args: [v.username.trim(), hash, 'VOTER', v.fullName.trim(), v.poste?.trim() || null],
       })
       created.push({ id: Number(result.lastInsertRowid), username: v.username.trim() })
     } catch (err) {

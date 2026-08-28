@@ -16,7 +16,10 @@ function TourResults({ results, colors }) {
       {results.map(r => (
         <div key={r.id}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: colors.gray700, marginBottom: 3 }}>
-            <span style={{ fontWeight: 600 }}>{r.full_name}</span>
+            <span>
+              <span style={{ fontWeight: 600 }}>{r.full_name}</span>
+              {r.poste && <span style={{ color: colors.gray400 }}> · {r.poste}</span>}
+            </span>
             <strong>{r.votes} voix</strong>
           </div>
           <div style={{ height: 6, borderRadius: 999, background: colors.gray100, overflow: 'hidden' }}>
@@ -58,7 +61,10 @@ function CandidateCard({ candidate, selected, onSelect, onViewProgram }) {
       )}
       <img src={candidatePhotoUrl(candidate.photo_path)} alt={candidate.full_name}
         style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', background: colors.gray100, border: `3px solid ${colors.white}`, boxShadow: theme.shadow.md }} />
-      <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.gray900, textAlign: 'center', lineHeight: 1.35 }}>{candidate.full_name}</span>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: colors.gray900, lineHeight: 1.35 }}>{candidate.full_name}</div>
+        {candidate.poste && <div style={{ fontSize: 10.5, color: colors.gray400, marginTop: 1 }}>{candidate.poste}</div>}
+      </div>
       <button
         type="button"
         onClick={e => { e.stopPropagation(); onViewProgram() }}
@@ -93,7 +99,7 @@ function CandidateDetail({ candidate, selected, onBack, onSelect }) {
           style={{ width: 68, height: 68, borderRadius: '50%', objectFit: 'cover', background: colors.gray100, border: `3px solid ${colors.white}`, boxShadow: theme.shadow.md, flexShrink: 0 }} />
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: colors.gray900 }}>{candidate.full_name}</div>
-          <div style={{ fontSize: 12, color: colors.gray400, marginTop: 2 }}>Candidat</div>
+          <div style={{ fontSize: 12, color: colors.gray400, marginTop: 2 }}>{candidate.poste || 'Candidat'}</div>
         </div>
       </div>
 
