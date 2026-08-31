@@ -32,6 +32,8 @@ function AuthedApp() {
             <Route path="/admin/voters"               element={<VotersImport />} />
             <Route path="/admin/sessions/:sessionId"  element={<SessionDetail />} />
             <Route path="/admin/votes/:voteId"        element={<VoteManage />} />
+            {/* Les comptes RH sont aussi votants — ils gardent accès à leur propre bulletin. */}
+            <Route path="/mon-vote"                   element={<VoterDashboard />} />
             <Route path="*"                           element={<Navigate to="/admin" replace />} />
           </>
         ) : (

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { getVoteDetail, getVoteResultsAdmin, createCandidate, deleteCandidate, updateCandidateInfo, deleteVote, publishTourResults, candidatePhotoUrl, candidateSelfLink } from '../../api/vote.js'
+import { getVoteDetail, getVoteResultsAdmin, createCandidate, deleteCandidate, updateCandidateInfo, deleteVote, publishTourResults, candidatePhotoUrl, candidateSelfLink, searchUsers } from '../../api/vote.js'
 
 const STATUS = {
   UPCOMING: { label: 'À venir', badge: 'badge-gray' },
@@ -103,6 +103,57 @@ function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, o
             </button>
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+/** Recherche parmi les employés déjà importés (comptes existants) pour
+ * pré-remplir nom + poste au lieu de ressaisir à la main — reste modifiable
+ * ensuite si le candidat n'est pas trouvé dans la liste. */
+function EmployeePicker({ value, onChange, colors, radius }) {
+  const [results, setResults] = useState([])
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    const q = value.trim()
+    if (q.length < 2) { setResults([]); return }
+    const id = setTimeout(async () => {
+      try { setResults(await searchUsers(q)) } catch { setResults([]) }
+    }, 250)
+    return () => clearTimeout(id)
+  }, [value])
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        className="form-control"
+        value={value}
+        onChange={e => { onChange({ fullName: e.target.value }); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Rechercher un employé…"
+        autoFocus
+        required
+      />
+      {open && results.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, zIndex: 20,
+          background: colors.white, border: `1px solid ${colors.gray200}`, borderRadius: radius.md,
+          boxShadow: theme.shadow.lg, maxHeight: 220, overflowY: 'auto',
+        }}>
+          {results.map(u => (
+            <button key={u.id} type="button"
+              onMouseDown={() => { onChange({ fullName: u.full_name, poste: u.poste ?? '' }); setOpen(false) }}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px',
+                background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: colors.gray800 }}>{u.full_name}</div>
+              {u.poste && <div style={{ fontSize: 11, color: colors.gray400 }}>{u.poste}</div>}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -308,7 +359,12 @@ export default function VoteManage() {
             <form onSubmit={handleAddCandidate} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="form-group">
                 <label className="form-label">Nom complet *</label>
-                <input className="form-control" value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))} autoFocus required />
+                <EmployeePicker
+                  value={form.fullName}
+                  onChange={patch => setForm(f => ({ ...f, ...patch }))}
+                  colors={colors}
+                  radius={radius}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Poste (optionnel)</label>

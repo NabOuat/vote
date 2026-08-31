@@ -22,9 +22,12 @@ export function requireAuth(req, res, next) {
   }
 }
 
+/** Accepte un rôle unique ou un tableau (ex. les comptes RH sont à la fois
+ * ADMIN_VOTE et autorisés à voter — requireRole(['VOTER','ADMIN_VOTE'])). */
 export function requireRole(role) {
+  const allowed = Array.isArray(role) ? role : [role]
   return (req, res, next) => {
-    if (req.user?.role !== role) {
+    if (!allowed.includes(req.user?.role)) {
       return res.status(403).json({ message: 'Accès refusé.' })
     }
     next()

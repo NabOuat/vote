@@ -248,10 +248,11 @@ adminRouter.post('/voters/import', asyncHandler(async (req, res) => {
       continue
     }
     try {
+      const role = v.role === 'ADMIN_VOTE' ? 'ADMIN_VOTE' : 'VOTER'
       const hash = bcrypt.hashSync(v.password, 10)
       const result = await db.execute({
         sql: 'INSERT INTO users (username, password_hash, role, full_name, poste) VALUES (?, ?, ?, ?, ?)',
-        args: [v.username.trim(), hash, 'VOTER', v.fullName.trim(), v.poste?.trim() || null],
+        args: [v.username.trim(), hash, role, v.fullName.trim(), v.poste?.trim() || null],
       })
       created.push({ id: Number(result.lastInsertRowid), username: v.username.trim() })
     } catch (err) {
@@ -260,6 +261,19 @@ adminRouter.post('/voters/import', asyncHandler(async (req, res) => {
   }
 
   res.status(201).json({ created, errors })
+}))
+
+/** Recherche parmi les comptes existants (votants + admins) — utilisé par
+ * l'admin pour choisir un candidat parmi les employés déjà importés, plutôt
+ * que de ressaisir un nom à la main. */
+adminRouter.get('/users/search', asyncHandler(async (req, res) => {
+  const q = (req.query.q ?? '').trim()
+  if (q.length < 2) return res.json([])
+  const { rows } = await db.execute({
+    sql: 'SELECT id, full_name, poste FROM users WHERE active = 1 AND full_name LIKE ? ORDER BY full_name LIMIT 20',
+    args: [`%${q}%`],
+  })
+  res.json(rows)
 }))
 
 /* ── Résultats & publication ──────────────────────────────────────────

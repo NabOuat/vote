@@ -6,7 +6,10 @@ import { tallyTour } from '../services/tally.service.js'
 import { asyncHandler } from '../lib/asyncHandler.js'
 
 export const voterRouter = Router()
-voterRouter.use(requireAuth, requireRole('VOTER'))
+// Les comptes RH sont à la fois admin ET votants (même personne, un seul
+// compte) — ils doivent donc pouvoir accéder à ces routes de vote comme
+// n'importe quel VOTER.
+voterRouter.use(requireAuth, requireRole(['VOTER', 'ADMIN_VOTE']))
 
 /** Liste des votes (toutes sessions confondues) avec l'état de chaque tour pour ce votant. */
 voterRouter.get('/me/votes', asyncHandler(async (req, res) => {

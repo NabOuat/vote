@@ -49,6 +49,7 @@ export const updateCandidateInfo = (candidateId, { program, poste }) => voteApiF
 
 /* ── Admin — votants ──────────────────────────────────────────────── */
 export const importVoters = (voters) => voteApiFetch('/admin/voters/import', { method: 'POST', body: JSON.stringify({ voters }) })
+export const searchUsers   = (q) => voteApiFetch(`/admin/users/search?q=${encodeURIComponent(q)}`)
 
 /* ── Votant ───────────────────────────────────────────────────────── */
 export const listMyVotes    = () => voteApiFetch('/me/votes')

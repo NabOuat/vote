@@ -48,7 +48,10 @@ export default function VoteLayout({ children }) {
 
           <nav style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
             {isAdmin ? (
-              <NavLink to="/admin" style={linkStyle} end>Sessions</NavLink>
+              <>
+                <NavLink to="/admin" style={linkStyle} end>Sessions</NavLink>
+                <NavLink to="/mon-vote" style={linkStyle} end>Mon vote</NavLink>
+              </>
             ) : (
               <NavLink to="/" style={linkStyle} end>Mes votes</NavLink>
             )}
