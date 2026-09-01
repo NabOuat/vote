@@ -233,7 +233,15 @@ adminRouter.delete('/candidates/:candidateId', asyncHandler(async (req, res) => 
   res.status(204).end()
 }))
 
-/* ── Votants (import en masse) ────────────────────────────────────── */
+/* ── Votants (import en masse) ────────────────────────────────────── *
+ * Deux sources possibles côté frontend (mêmes règles ici) : collage CSV
+ * manuel, ou fichier Excel (username/role/fullName/category/password — voir
+ * VotersImport.jsx et scripts/import-employees.mjs). Le mot de passe est
+ * toujours fourni en clair par la RH, jamais généré côté serveur. */
+const VOTER_ROLES = new Set(['VOTER', 'ADMIN_VOTE'])
+const VOTER_CATEGORIES = new Set(['Cadre', 'Agent'])
+const AFOR_USERNAME_SUFFIX = '@afor.ci'
+
 adminRouter.post('/voters/import', asyncHandler(async (req, res) => {
   const { voters } = req.body ?? {}
   if (!Array.isArray(voters) || voters.length === 0) {
@@ -243,24 +251,68 @@ adminRouter.post('/voters/import', asyncHandler(async (req, res) => {
   const created = []
   const errors = []
   for (const v of voters) {
-    if (!v.username?.trim() || !v.fullName?.trim() || !v.password) {
-      errors.push({ username: v.username ?? null, message: 'username, fullName et password sont requis.' })
+    const username = String(v.username ?? '').trim().toLowerCase()
+    const fullName = v.fullName?.trim()
+    const role = v.role?.trim()
+    const category = v.category?.trim() || null
+    const label = username || null
+
+    if (!username || !fullName || !v.password) {
+      errors.push({ username: label, message: 'username, fullName et password sont requis.' })
       continue
     }
+    if (!username.endsWith(AFOR_USERNAME_SUFFIX)) {
+      errors.push({ username: label, message: `username doit se terminer par ${AFOR_USERNAME_SUFFIX}.` })
+      continue
+    }
+    if (role && !VOTER_ROLES.has(role)) {
+      errors.push({ username: label, message: 'role doit être VOTER ou ADMIN_VOTE.' })
+      continue
+    }
+    if (category && !VOTER_CATEGORIES.has(category)) {
+      errors.push({ username: label, message: 'category doit être Cadre ou Agent.' })
+      continue
+    }
+
     try {
-      const role = v.role === 'ADMIN_VOTE' ? 'ADMIN_VOTE' : 'VOTER'
       const hash = bcrypt.hashSync(v.password, 10)
       const result = await db.execute({
-        sql: 'INSERT INTO users (username, password_hash, role, full_name, poste) VALUES (?, ?, ?, ?, ?)',
-        args: [v.username.trim(), hash, role, v.fullName.trim(), v.poste?.trim() || null],
+        sql: 'INSERT INTO users (username, password_hash, role, full_name, poste, category) VALUES (?, ?, ?, ?, ?, ?)',
+        args: [username, hash, role || 'VOTER', fullName, v.poste?.trim() || null, category],
       })
-      created.push({ id: Number(result.lastInsertRowid), username: v.username.trim() })
+      created.push({ id: Number(result.lastInsertRowid), username })
     } catch (err) {
-      errors.push({ username: v.username, message: String(err.message).includes('UNIQUE') ? 'Identifiant déjà utilisé.' : err.message })
+      errors.push({ username, message: String(err.message).includes('UNIQUE') ? 'Identifiant déjà utilisé.' : err.message })
     }
   }
 
   res.status(201).json({ created, errors })
+}))
+
+/** Vide la base des votants (role VOTER uniquement — les comptes ADMIN_VOTE
+ * ne sont jamais touchés ici, pour ne pas se retrouver sans accès admin).
+ *
+ * Supprime TOUS les votants, y compris ceux ayant déjà voté : leurs
+ * vote_receipts sont supprimés avec eux. Action irréversible, à réserver à
+ * un reset de données de test, jamais sur un scrutin réel. */
+adminRouter.delete('/voters', asyncHandler(async (req, res) => {
+  const { rows: targets } = await db.execute(`SELECT id FROM users WHERE role = 'VOTER'`)
+
+  if (targets.length > 0) {
+    const tx = await db.transaction('write')
+    try {
+      for (const u of targets) {
+        await tx.execute({ sql: 'DELETE FROM vote_receipts WHERE voter_id = ?', args: [u.id] })
+        await tx.execute({ sql: 'DELETE FROM users WHERE id = ?', args: [u.id] })
+      }
+      await tx.commit()
+    } catch (err) {
+      await tx.rollback()
+      throw err
+    }
+  }
+
+  res.json({ deleted: targets.length })
 }))
 
 /** Recherche parmi les comptes existants (votants + admins) — utilisé par

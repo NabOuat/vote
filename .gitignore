@@ -14,7 +14,7 @@ server/vote.db-wal
 # Photos de candidats uploadées
 server/uploads/
 
-# Fichiers d'import employés — noms/emails/mots de passe en clair, JAMAIS commité
+# Fichiers d'import employés — noms/emails en clair, JAMAIS commité
 employees_import.json
 *.xlsx
 

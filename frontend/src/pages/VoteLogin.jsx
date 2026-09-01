@@ -91,7 +91,9 @@ export default function VoteLogin() {
     setError('')
     setLoading(true)
     try {
-      await signIn(username.trim(), password)
+      // Identifiant normalisé : c'est l'email pro, saisi indifféremment en
+      // majuscules ou minuscules, et stocké en minuscules à l'import.
+      await signIn(username.trim().toLowerCase(), password)
     } catch (err) {
       setError(err.message ?? 'Identifiants incorrects.')
       setShake(true)
@@ -164,7 +166,7 @@ export default function VoteLogin() {
               value={username}
               onChange={e => setUsername(e.target.value)}
               disabled={loading}
-              placeholder="ex. admin.afor"
+              placeholder="prenom.nom@afor.ci"
               required
               autoFocus
             />

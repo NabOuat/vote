@@ -50,6 +50,10 @@ export const updateCandidateInfo = (candidateId, { program, poste }) => voteApiF
 /* ── Admin — votants ──────────────────────────────────────────────── */
 export const importVoters = (voters) => voteApiFetch('/admin/voters/import', { method: 'POST', body: JSON.stringify({ voters }) })
 export const searchUsers   = (q) => voteApiFetch(`/admin/users/search?q=${encodeURIComponent(q)}`)
+/** Supprime TOUS les votants (role VOTER), y compris ceux ayant déjà voté
+ * (leurs vote_receipts sont supprimés avec eux). Action irréversible. Les
+ * comptes ADMIN_VOTE ne sont jamais touchés. */
+export const clearVoters = () => voteApiFetch('/admin/voters', { method: 'DELETE' })
 
 /* ── Votant ───────────────────────────────────────────────────────── */
 export const listMyVotes    = () => voteApiFetch('/me/votes')
