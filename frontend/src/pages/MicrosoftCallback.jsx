@@ -16,24 +16,14 @@ export default function MicrosoftCallback() {
     const fullName = params.get('fullName')
     const poste = params.get('poste') ?? ''
     const photoPath = params.get('photoPath') ?? ''
+    const mobilePhone = params.get('mobilePhone') ?? ''
     if (token && role && fullName) {
       voteTokenStore.set(token)
-      localStorage.setItem('vote_user', JSON.stringify({ role, fullName, poste, photoPath }))
+      localStorage.setItem('vote_user', JSON.stringify({ role, fullName, poste, photoPath, mobilePhone }))
       // Première connexion Microsoft de ce compte → WelcomePasswordModal se
       // charge de le proposer une fois arrivé dans l'app, puis nettoie ce
       // marqueur (voir set-password / skip-password-setup côté backend).
       if (params.get('needsPassword') === '1') localStorage.setItem('vote_needs_password', '1')
-    }
-    // TEMP DEBUG — à retirer : conserve le dump Microsoft brut (voir
-    // auth.routes.js) pour que le widget profil propose de le télécharger.
-    const msDebug = params.get('msDebug')
-    if (msDebug) {
-      try {
-        let b64 = msDebug.replace(/-/g, '+').replace(/_/g, '/')
-        while (b64.length % 4) b64 += '='
-        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
-        sessionStorage.setItem('vote_ms_debug', new TextDecoder().decode(bytes))
-      } catch { /* ignore */ }
     }
     window.location.replace('/')
   }, [params])

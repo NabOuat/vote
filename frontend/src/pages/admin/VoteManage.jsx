@@ -10,7 +10,7 @@ const STATUS = {
   CLOSED:   { label: 'Clôturé', badge: 'badge-orange' },
 }
 
-function ResultsBars({ ranking, colors }) {
+function ResultsBars({ ranking, onView, colors }) {
   const max = Math.max(1, ...ranking.map(r => r.votes))
   const total = ranking.reduce((s, r) => s + r.votes, 0)
   const winnerVotes = ranking[0]?.votes ?? 0
@@ -19,7 +19,7 @@ function ResultsBars({ ranking, colors }) {
       {ranking.map((r, i) => {
         const isWinner = r.votes === winnerVotes && winnerVotes > 0
         return (
-          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div key={r.id} onClick={() => onView(r)} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
             <span style={{
               width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
               background: isWinner ? colors.orange : colors.gray100,
@@ -54,15 +54,19 @@ function ResultsBars({ ranking, colors }) {
   )
 }
 
-function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, onEditProgram, colors, radius }) {
+function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, onEditProgram, onView, colors, radius }) {
   return (
-    <div style={{
-      padding: '14px 12px 12px', borderRadius: radius.lg, textAlign: 'center', position: 'relative',
-      border: `1px solid ${colors.gray100}`, background: colors.white,
-      transition: 'box-shadow 0.15s',
-    }}>
+    <div
+      onClick={onView}
+      style={{
+        padding: '14px 12px 12px', borderRadius: radius.lg, textAlign: 'center', position: 'relative',
+        border: `1px solid ${colors.gray100}`, background: colors.white,
+        transition: 'box-shadow 0.15s, transform 0.15s', cursor: 'pointer',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = theme.shadow.md; e.currentTarget.style.transform = 'translateY(-1px)' }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none' }}>
       {canEdit && (
-        <button onClick={onDelete} title="Supprimer ce candidat"
+        <button onClick={e => { e.stopPropagation(); onDelete() }} title="Supprimer ce candidat"
           style={{
             position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%', border: 'none',
             background: colors.errorBg, color: colors.errorText, cursor: 'pointer', fontSize: 13,
@@ -88,11 +92,11 @@ function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, o
             {candidate.program ? 'Programme reçu' : 'Programme en attente'}
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-            <button type="button" onClick={onEditProgram}
+            <button type="button" onClick={e => { e.stopPropagation(); onEditProgram() }}
               style={{ flex: 1, fontSize: 10.5, fontWeight: 600, color: colors.gray700, background: colors.gray100, border: 'none', borderRadius: 20, padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit' }}>
               Poste / programme
             </button>
-            <button type="button" onClick={onCopyLink} title="Copier le lien candidat"
+            <button type="button" onClick={e => { e.stopPropagation(); onCopyLink() }} title="Copier le lien candidat"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.green,
                 background: 'none', border: `1px solid ${colors.gray200}`, borderRadius: 20, padding: '4px 9px', cursor: 'pointer',
@@ -104,6 +108,40 @@ function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, o
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+/** Détail d'un candidat en lecture seule — ouvert en cliquant sur sa carte
+ * (grille admin ou barre de résultats), même contenu que ce qu'un votant
+ * verrait via "Voir le programme". */
+function CandidateDetailModal({ candidate, votes, onClose, colors, radius }) {
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 440 }}>
+        <div className="modal-header">
+          <div className="modal-title">Fiche candidat</div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
+          <img src={candidatePhotoUrl(candidate.photo_path)} alt={candidate.full_name}
+            style={{ width: 68, height: 68, borderRadius: '50%', objectFit: 'cover', background: colors.gray100, border: `3px solid ${colors.white}`, boxShadow: theme.shadow.md, flexShrink: 0 }} />
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: colors.gray900 }}>{candidate.full_name}</div>
+            <div style={{ fontSize: 12, color: colors.gray400, marginTop: 2 }}>{candidate.poste || 'Candidat'}</div>
+            {votes != null && <div style={{ fontSize: 12, color: colors.greenDark, fontWeight: 700, marginTop: 3 }}>{votes} voix</div>}
+          </div>
+        </div>
+        <div style={{
+          background: colors.gray50, border: `1px solid ${colors.gray100}`, borderRadius: radius.lg,
+          padding: '16px 18px', fontSize: 13.5, color: colors.gray700, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+          minHeight: 80,
+        }}>
+          {candidate.program?.trim() ? candidate.program : (
+            <span style={{ color: colors.gray400, fontStyle: 'italic' }}>Ce candidat n'a pas encore renseigné de programme.</span>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -182,6 +220,7 @@ export default function VoteManage() {
   const [programText, setProgramText] = useState('')
   const [posteText, setPosteText] = useState('')
   const [savingProgram, setSavingProgram] = useState(false)
+  const [viewCandidate, setViewCandidate] = useState(null) // { candidate, votes }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -329,7 +368,7 @@ export default function VoteManage() {
             </div>
 
             {tour.status === 'CLOSED' && ranking.length > 0 ? (
-              <ResultsBars ranking={ranking} colors={colors} />
+              <ResultsBars ranking={ranking} onView={r => setViewCandidate({ candidate: r, votes: r.votes })} colors={colors} />
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
                 {tour.candidates.map(c => (
@@ -341,6 +380,7 @@ export default function VoteManage() {
                     onDelete={() => handleDeleteCandidate(c.id)}
                     onCopyLink={() => handleCopyLink(c)}
                     onEditProgram={() => openProgramModal(c)}
+                    onView={() => setViewCandidate({ candidate: c, votes: ranking.find(r => r.id === c.id)?.votes })}
                     colors={colors}
                     radius={radius}
                   />
@@ -441,6 +481,16 @@ export default function VoteManage() {
             </form>
           </div>
         </div>
+      )}
+
+      {viewCandidate && (
+        <CandidateDetailModal
+          candidate={viewCandidate.candidate}
+          votes={viewCandidate.votes}
+          onClose={() => setViewCandidate(null)}
+          colors={colors}
+          radius={radius}
+        />
       )}
     </div>
   )

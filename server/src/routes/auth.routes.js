@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import { db } from '../db.js'
 import { signToken, requireAuth } from '../middleware/auth.js'
 import { asyncHandler } from '../lib/asyncHandler.js'
-import { isMicrosoftLoginConfigured, buildAuthorizeUrl, generateState, wasSilentAttempt, exchangeCode, fetchJobTitle, fetchProfilePhoto, fetchFullProfile } from '../services/microsoftAuth.service.js'
+import { isMicrosoftLoginConfigured, buildAuthorizeUrl, generateState, wasSilentAttempt, exchangeCode, fetchProfileFields, fetchProfilePhoto } from '../services/microsoftAuth.service.js'
 import { storeCandidatePhoto } from '../middleware/upload.js'
 
 export const authRouter = Router()
@@ -23,7 +23,7 @@ authRouter.post('/login', asyncHandler(async (req, res) => {
   }
 
   const token = signToken(user)
-  res.json({ token, role: user.role, fullName: user.full_name, poste: user.poste ?? '', photoPath: user.photo_path ?? '' })
+  res.json({ token, role: user.role, fullName: user.full_name, poste: user.poste ?? '', photoPath: user.photo_path ?? '', mobilePhone: user.mobile_phone ?? '' })
 }))
 
 /** Définit (ou redéfinit) le mot de passe personnel de l'utilisateur connecté
@@ -97,9 +97,9 @@ authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
   if (!state || state !== cookies.ms_oauth_state) return fail('Requête invalide (état expiré ou incorrect) — réessaie.')
   res.setHeader('Set-Cookie', 'ms_oauth_state=; Path=/; HttpOnly; Max-Age=0')
 
-  let email, accessToken, idTokenClaims
+  let email, accessToken
   try {
-    ;({ email, accessToken, idTokenClaims } = await exchangeCode(code))
+    ;({ email, accessToken } = await exchangeCode(code))
   } catch (err) {
     return fail(err.message ?? 'Échec de la connexion Microsoft.')
   }
@@ -110,14 +110,18 @@ authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
   })
   if (!user) return fail(`Aucun compte de vote associé à ${email}.`)
 
-  // Best effort : complète le poste depuis l'annuaire Microsoft s'il n'a
-  // jamais été renseigné (import Excel sans la colonne, ou candidat créé
-  // sans poste) — n'écrase jamais une valeur déjà saisie manuellement.
-  if (!user.poste) {
-    const jobTitle = await fetchJobTitle(accessToken)
-    if (jobTitle) {
-      await db.execute({ sql: 'UPDATE users SET poste = ? WHERE id = ?', args: [jobTitle, user.id] })
-      user.poste = jobTitle
+  // Best effort : complète poste + téléphone depuis l'annuaire Microsoft
+  // s'ils n'ont jamais été renseignés (import Excel sans la colonne, ou
+  // candidat créé sans) — n'écrase jamais une valeur déjà saisie
+  // manuellement.
+  if (!user.poste || !user.mobile_phone) {
+    const { jobTitle, mobilePhone } = await fetchProfileFields(accessToken)
+    const nextPoste = user.poste || jobTitle
+    const nextPhone = user.mobile_phone || mobilePhone
+    if (nextPoste !== user.poste || nextPhone !== user.mobile_phone) {
+      await db.execute({ sql: 'UPDATE users SET poste = ?, mobile_phone = ? WHERE id = ?', args: [nextPoste ?? null, nextPhone ?? null, user.id] })
+      user.poste = nextPoste
+      user.mobile_phone = nextPhone
     }
   }
 
@@ -136,19 +140,8 @@ authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
   const token = signToken(user)
   const params = new URLSearchParams({
     token, role: user.role, fullName: user.full_name,
-    poste: user.poste ?? '', photoPath: user.photo_path ?? '',
+    poste: user.poste ?? '', photoPath: user.photo_path ?? '', mobilePhone: user.mobile_phone ?? '',
     needsPassword: user.ms_onboarded ? '0' : '1',
   })
-
-  // TEMP DEBUG — à retirer : dump complet de ce que Microsoft nous a envoyé
-  // (claims du id_token + profil Graph sans filtre), pour décider quels
-  // champs vaut la peine d'exploiter. Encodé dans l'URL plutôt que stocké
-  // en base — purement transitoire, jamais persisté.
-  try {
-    const graphProfile = await fetchFullProfile(accessToken)
-    const debugPayload = Buffer.from(JSON.stringify({ idTokenClaims, graphProfile }, null, 2)).toString('base64url')
-    params.set('msDebug', debugPayload)
-  } catch { /* le dump ne doit jamais bloquer la connexion */ }
-
   res.redirect(`${frontendBase}/auth/ms-callback?${params.toString()}`)
 }))

@@ -26,26 +26,11 @@ function Avatar({ user, size, colors }) {
   )
 }
 
-// TEMP DEBUG — à retirer : télécharge le dump brut Microsoft (claims du
-// token + profil Graph complet) déposé par MicrosoftCallback.jsx.
-function downloadMsDebug() {
-  const raw = sessionStorage.getItem('vote_ms_debug')
-  if (!raw) return
-  const blob = new Blob([raw], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'microsoft-infos.json'
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 export default function VoteLayout({ children }) {
   const { colors, radius } = theme
   const { user, signOut } = useVoteAuth()
   const isAdmin = user?.role === 'ADMIN_VOTE'
   const [profileOpen, setProfileOpen] = useState(false)
-  const hasMsDebug = typeof window !== 'undefined' && Boolean(sessionStorage.getItem('vote_ms_debug'))
 
   const linkStyle = ({ isActive }) => ({
     padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
@@ -115,33 +100,46 @@ export default function VoteLayout({ children }) {
 
             {profileOpen && (
               <div style={{
-                position: 'absolute', top: '100%', right: 0, marginTop: 8, width: 240, zIndex: 30,
+                position: 'absolute', top: '100%', right: 0, marginTop: 8, width: 260, zIndex: 30,
                 background: colors.white, border: `1px solid ${colors.gray200}`, borderRadius: radius.lg,
-                boxShadow: theme.shadow.lg, padding: 18,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center',
+                boxShadow: theme.shadow.lg, overflow: 'hidden',
+                animation: 'fadeIn 0.15s ease',
               }}>
-                <Avatar user={user} size={56} colors={colors} />
-                <div style={{ fontSize: 14, fontWeight: 700, color: colors.gray900, marginTop: 4 }}>{user?.fullName}</div>
-                {user?.poste && <div style={{ fontSize: 12, color: colors.gray500 }}>{user.poste}</div>}
-                <span className={`badge ${isAdmin ? 'badge-purple' : 'badge-green'}`} style={{ marginTop: 4 }}>
-                  {isAdmin ? 'Administrateur' : 'Votant'}
-                </span>
-                {hasMsDebug && (
+                <div style={{
+                  padding: '22px 18px 16px', textAlign: 'center',
+                  background: `linear-gradient(180deg, ${colors.greenLight} 0%, ${colors.white} 100%)`,
+                }}>
+                  <div style={{ display: 'inline-flex', padding: 3, borderRadius: '50%', background: colors.white, boxShadow: theme.shadow.sm }}>
+                    <Avatar user={user} size={60} colors={colors} />
+                  </div>
+                  <div style={{ fontSize: 14.5, fontWeight: 700, color: colors.gray900, marginTop: 10 }}>{user?.fullName}</div>
+                  {user?.poste && <div style={{ fontSize: 12, color: colors.gray500, marginTop: 1 }}>{user.poste}</div>}
+                  <span className={`badge ${isAdmin ? 'badge-purple' : 'badge-green'}`} style={{ marginTop: 8 }}>
+                    {isAdmin ? 'Administrateur' : 'Votant'}
+                  </span>
+                </div>
+
+                {user?.mobilePhone && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px',
+                    borderTop: `1px solid ${colors.gray100}`, fontSize: 12.5, color: colors.gray600,
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.gray400} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                    {user.mobilePhone}
+                  </div>
+                )}
+
+                <div style={{ padding: 14, borderTop: `1px solid ${colors.gray100}` }}>
                   <button
                     type="button"
-                    onMouseDown={downloadMsDebug}
+                    onClick={signOut}
                     className="btn btn-secondary btn-sm"
-                    style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}>
-                    Télécharger infos Microsoft (debug)
+                    style={{ width: '100%', justifyContent: 'center' }}>
+                    Déconnexion
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={signOut}
-                  className="btn btn-secondary btn-sm"
-                  style={{ width: '100%', justifyContent: 'center', marginTop: hasMsDebug ? 6 : 12 }}>
-                  Déconnexion
-                </button>
+                </div>
               </div>
             )}
           </div>

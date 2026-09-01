@@ -66,6 +66,9 @@ async function runMigrations() {
   // connecte via Microsoft (peu importe qu'il ait déjà utilisé le login
   // classique avant).
   await ensureColumn('users', 'ms_onboarded', 'INTEGER NOT NULL DEFAULT 0')
+
+  // 007 — téléphone mobile, récupéré depuis Microsoft Graph comme le poste.
+  await ensureColumn('users', 'mobile_phone', 'TEXT')
 }
 
 let migrated = null

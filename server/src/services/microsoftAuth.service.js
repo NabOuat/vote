@@ -86,36 +86,23 @@ export async function exchangeCode(code) {
   return { email: email.toLowerCase(), accessToken: data.access_token, idTokenClaims: payload }
 }
 
-// TEMP DEBUG — à retirer une fois qu'on a décidé quels champs Microsoft
-// exploiter réellement. Renvoie le profil Graph complet (sans $select),
-// pour voir tout ce que l'annuaire AFOR expose vraiment.
-export async function fetchFullProfile(accessToken) {
-  if (!accessToken) return null
+/** Poste + téléphone mobile depuis Microsoft Graph, en un seul appel — best
+ * effort : ne doit jamais faire échouer la connexion si Graph est
+ * indisponible ou si ces champs sont vides côté annuaire. */
+export async function fetchProfileFields(accessToken) {
+  if (!accessToken) return {}
   try {
-    const res = await fetch('https://graph.microsoft.com/v1.0/me', {
+    const res = await fetch('https://graph.microsoft.com/v1.0/me?$select=jobTitle,mobilePhone', {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
-    if (!res.ok) return { error: `Graph a répondu ${res.status}` }
-    return await res.json()
-  } catch (err) {
-    return { error: String(err.message ?? err) }
-  }
-}
-
-/** Poste occupé (jobTitle) depuis Microsoft Graph — best effort : ne doit
- * jamais faire échouer la connexion si Graph est indisponible ou si le champ
- * est vide côté annuaire. */
-export async function fetchJobTitle(accessToken) {
-  if (!accessToken) return null
-  try {
-    const res = await fetch('https://graph.microsoft.com/v1.0/me?$select=jobTitle', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!res.ok) return null
+    if (!res.ok) return {}
     const data = await res.json()
-    return data.jobTitle?.trim() || null
+    return {
+      jobTitle: data.jobTitle?.trim() || null,
+      mobilePhone: data.mobilePhone?.trim() || null,
+    }
   } catch {
-    return null
+    return {}
   }
 }
 
