@@ -26,11 +26,26 @@ function Avatar({ user, size, colors }) {
   )
 }
 
+// TEMP DEBUG — à retirer : télécharge le dump brut Microsoft (claims du
+// token + profil Graph complet) déposé par MicrosoftCallback.jsx.
+function downloadMsDebug() {
+  const raw = sessionStorage.getItem('vote_ms_debug')
+  if (!raw) return
+  const blob = new Blob([raw], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'microsoft-infos.json'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function VoteLayout({ children }) {
   const { colors, radius } = theme
   const { user, signOut } = useVoteAuth()
   const isAdmin = user?.role === 'ADMIN_VOTE'
   const [profileOpen, setProfileOpen] = useState(false)
+  const hasMsDebug = typeof window !== 'undefined' && Boolean(sessionStorage.getItem('vote_ms_debug'))
 
   const linkStyle = ({ isActive }) => ({
     padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
@@ -111,11 +126,20 @@ export default function VoteLayout({ children }) {
                 <span className={`badge ${isAdmin ? 'badge-purple' : 'badge-green'}`} style={{ marginTop: 4 }}>
                   {isAdmin ? 'Administrateur' : 'Votant'}
                 </span>
+                {hasMsDebug && (
+                  <button
+                    type="button"
+                    onMouseDown={downloadMsDebug}
+                    className="btn btn-secondary btn-sm"
+                    style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}>
+                    Télécharger infos Microsoft (debug)
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={signOut}
                   className="btn btn-secondary btn-sm"
-                  style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}>
+                  style={{ width: '100%', justifyContent: 'center', marginTop: hasMsDebug ? 6 : 12 }}>
                   Déconnexion
                 </button>
               </div>

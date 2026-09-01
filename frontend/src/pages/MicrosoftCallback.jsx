@@ -20,6 +20,17 @@ export default function MicrosoftCallback() {
       voteTokenStore.set(token)
       localStorage.setItem('vote_user', JSON.stringify({ role, fullName, poste, photoPath }))
     }
+    // TEMP DEBUG — à retirer : conserve le dump Microsoft brut (voir
+    // auth.routes.js) pour que le widget profil propose de le télécharger.
+    const msDebug = params.get('msDebug')
+    if (msDebug) {
+      try {
+        let b64 = msDebug.replace(/-/g, '+').replace(/_/g, '/')
+        while (b64.length % 4) b64 += '='
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+        sessionStorage.setItem('vote_ms_debug', new TextDecoder().decode(bytes))
+      } catch { /* ignore */ }
+    }
     window.location.replace('/')
   }, [params])
 

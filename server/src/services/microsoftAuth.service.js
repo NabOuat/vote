@@ -83,7 +83,23 @@ export async function exchangeCode(code) {
 
   const email = payload.email ?? payload.preferred_username
   if (!email) throw new Error('Le jeton Microsoft ne contient aucune adresse email.')
-  return { email: email.toLowerCase(), accessToken: data.access_token }
+  return { email: email.toLowerCase(), accessToken: data.access_token, idTokenClaims: payload }
+}
+
+// TEMP DEBUG — à retirer une fois qu'on a décidé quels champs Microsoft
+// exploiter réellement. Renvoie le profil Graph complet (sans $select),
+// pour voir tout ce que l'annuaire AFOR expose vraiment.
+export async function fetchFullProfile(accessToken) {
+  if (!accessToken) return null
+  try {
+    const res = await fetch('https://graph.microsoft.com/v1.0/me', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return { error: `Graph a répondu ${res.status}` }
+    return await res.json()
+  } catch (err) {
+    return { error: String(err.message ?? err) }
+  }
 }
 
 /** Poste occupé (jobTitle) depuis Microsoft Graph — best effort : ne doit

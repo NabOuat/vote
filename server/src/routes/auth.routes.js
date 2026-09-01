@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import { db } from '../db.js'
 import { signToken } from '../middleware/auth.js'
 import { asyncHandler } from '../lib/asyncHandler.js'
-import { isMicrosoftLoginConfigured, buildAuthorizeUrl, generateState, wasSilentAttempt, exchangeCode, fetchJobTitle, fetchProfilePhoto } from '../services/microsoftAuth.service.js'
+import { isMicrosoftLoginConfigured, buildAuthorizeUrl, generateState, wasSilentAttempt, exchangeCode, fetchJobTitle, fetchProfilePhoto, fetchFullProfile } from '../services/microsoftAuth.service.js'
 import { storeCandidatePhoto } from '../middleware/upload.js'
 
 export const authRouter = Router()
@@ -74,9 +74,9 @@ authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
   if (!state || state !== cookies.ms_oauth_state) return fail('Requête invalide (état expiré ou incorrect) — réessaie.')
   res.setHeader('Set-Cookie', 'ms_oauth_state=; Path=/; HttpOnly; Max-Age=0')
 
-  let email, accessToken
+  let email, accessToken, idTokenClaims
   try {
-    ;({ email, accessToken } = await exchangeCode(code))
+    ;({ email, accessToken, idTokenClaims } = await exchangeCode(code))
   } catch (err) {
     return fail(err.message ?? 'Échec de la connexion Microsoft.')
   }
@@ -115,5 +115,16 @@ authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
     token, role: user.role, fullName: user.full_name,
     poste: user.poste ?? '', photoPath: user.photo_path ?? '',
   })
+
+  // TEMP DEBUG — à retirer : dump complet de ce que Microsoft nous a envoyé
+  // (claims du id_token + profil Graph sans filtre), pour décider quels
+  // champs vaut la peine d'exploiter. Encodé dans l'URL plutôt que stocké
+  // en base — purement transitoire, jamais persisté.
+  try {
+    const graphProfile = await fetchFullProfile(accessToken)
+    const debugPayload = Buffer.from(JSON.stringify({ idTokenClaims, graphProfile }, null, 2)).toString('base64url')
+    params.set('msDebug', debugPayload)
+  } catch { /* le dump ne doit jamais bloquer la connexion */ }
+
   res.redirect(`${frontendBase}/auth/ms-callback?${params.toString()}`)
 }))
