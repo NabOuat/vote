@@ -11,6 +11,41 @@ const CATEGORY_FILTERS = [
   { value: 'Agent', label: 'Agent' },
 ]
 
+const PAGE_SIZE = 25
+
+function Pagination({ page, pageCount, onChange, colors }) {
+  if (pageCount <= 1) return null
+  const pages = []
+  const add = (n) => { if (!pages.includes(n) && n >= 1 && n <= pageCount) pages.push(n) }
+  add(1); add(page - 1); add(page); add(page + 1); add(pageCount)
+  const sorted = [...new Set(pages)].sort((a, b) => a - b)
+
+  const btnStyle = (active) => ({
+    minWidth: 30, height: 30, padding: '0 8px', borderRadius: 8,
+    border: `1px solid ${active ? colors.green : colors.gray200}`,
+    background: active ? colors.green : colors.white,
+    color: active ? colors.white : colors.gray600,
+    fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+  })
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 16 }}>
+      <button type="button" onClick={() => onChange(page - 1)} disabled={page === 1} style={{ ...btnStyle(false), opacity: page === 1 ? 0.4 : 1 }}>
+        ‹
+      </button>
+      {sorted.map((n, i) => (
+        <span key={n} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {i > 0 && sorted[i - 1] !== n - 1 && <span style={{ color: colors.gray300, fontSize: 12 }}>…</span>}
+          <button type="button" onClick={() => onChange(n)} style={btnStyle(n === page)}>{n}</button>
+        </span>
+      ))}
+      <button type="button" onClick={() => onChange(page + 1)} disabled={page === pageCount} style={{ ...btnStyle(false), opacity: page === pageCount ? 0.4 : 1 }}>
+        ›
+      </button>
+    </div>
+  )
+}
+
 export default function VotersList() {
   const { colors } = theme
   const toast = useToast()
@@ -20,6 +55,7 @@ export default function VotersList() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -44,6 +80,12 @@ export default function VotersList() {
     return (v.full_name ?? '').toLowerCase().includes(q)
       || (v.username ?? '').toLowerCase().includes(q)
   })
+
+  useEffect(() => { setPage(1) }, [filter, search, isAdmin])
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   const counts = {
     total: voters.length,
@@ -113,9 +155,9 @@ export default function VotersList() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((v, i) => (
+              {pageItems.map((v, i) => (
                 <tr key={v.id} style={{
-                  borderBottom: i < filtered.length - 1 ? `1px solid ${colors.gray50}` : 'none',
+                  borderBottom: i < pageItems.length - 1 ? `1px solid ${colors.gray50}` : 'none',
                   transition: 'background 0.1s',
                 }}
                   onMouseEnter={e => { e.currentTarget.style.background = colors.gray50 }}
@@ -143,6 +185,15 @@ export default function VotersList() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {!loading && filtered.length > 0 && (
+        <>
+          <div style={{ textAlign: 'center', fontSize: 11.5, color: colors.gray400, marginTop: 10 }}>
+            {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} sur {filtered.length}
+          </div>
+          <Pagination page={currentPage} pageCount={pageCount} onChange={setPage} colors={colors} />
+        </>
       )}
     </div>
   )
