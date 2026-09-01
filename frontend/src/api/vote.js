@@ -24,6 +24,11 @@ export function voteLogout() {
   voteTokenStore.clear()
 }
 
+/** Modal d'accueil à la première connexion Microsoft (voir VoteLayout.jsx /
+ * WelcomePasswordModal.jsx). */
+export const setPassword       = (password) => voteApiFetch('/auth/set-password', { method: 'POST', body: JSON.stringify({ password }) })
+export const skipPasswordSetup = () => voteApiFetch('/auth/skip-password-setup', { method: 'POST' })
+
 /* ── Admin — sessions & votes ─────────────────────────────────────── */
 export const listSessions        = () => voteApiFetch('/admin/sessions')
 export const createSession       = (data) => voteApiFetch('/admin/sessions', { method: 'POST', body: JSON.stringify(data) })
@@ -36,12 +41,16 @@ export const deleteSession        = (sessionId) => voteApiFetch(`/admin/sessions
 export const deleteVote           = (voteId) => voteApiFetch(`/admin/votes/${voteId}`, { method: 'DELETE' })
 
 /* ── Admin — candidats ────────────────────────────────────────────── */
-export function createCandidate(tourId, { fullName, poste, program, photo }) {
+/** `photo` (fichier uploadé) et `photoUrl` (photo Microsoft déjà en Blob,
+ * réutilisée telle quelle depuis le sélecteur d'employé) sont mutuellement
+ * exclusifs — l'un des deux est requis. */
+export function createCandidate(tourId, { fullName, poste, program, photo, photoUrl }) {
   const form = new FormData()
   form.append('fullName', fullName)
   if (poste) form.append('poste', poste)
   if (program) form.append('program', program)
-  form.append('photo', photo)
+  if (photo) form.append('photo', photo)
+  else if (photoUrl) form.append('photoUrl', photoUrl)
   return voteApiFetch(`/admin/tours/${tourId}/candidates`, { method: 'POST', body: form })
 }
 export const deleteCandidate = (candidateId) => voteApiFetch(`/admin/candidates/${candidateId}`, { method: 'DELETE' })

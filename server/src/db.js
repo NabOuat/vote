@@ -58,6 +58,21 @@ async function runMigrations() {
   // 005 — catégorie d'éligibilité d'un vote : 'Cadre', 'Agent' ou 'both'
   // (tout le monde). NULL est traité comme 'both' pour les votes préexistants.
   await ensureColumn('votes', 'category', "TEXT DEFAULT 'both'")
+
+  // 006 — photo de profil récupérée depuis Microsoft Graph à la connexion.
+  await ensureColumn('users', 'photo_path', 'TEXT')
+
+  // 007 — accueil à la première connexion Microsoft : propose de définir
+  // (ou re-définir) un mot de passe personnel pour pouvoir aussi se
+  // connecter par email — indépendant du mot de passe déjà attribué par la
+  // RH à l'import, que la personne ne connaît pas forcément dans la vraie
+  // vie. Se déclenche une seule fois par compte, la première fois qu'il se
+  // connecte via Microsoft (peu importe qu'il ait déjà utilisé le login
+  // classique avant).
+  await ensureColumn('users', 'ms_onboarded', 'INTEGER NOT NULL DEFAULT 0')
+
+  // 008 — téléphone mobile, récupéré depuis Microsoft Graph comme le poste.
+  await ensureColumn('users', 'mobile_phone', 'TEXT')
 }
 
 let migrated = null

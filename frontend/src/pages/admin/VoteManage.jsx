@@ -10,7 +10,7 @@ const STATUS = {
   CLOSED:   { label: 'Clôturé', badge: 'badge-orange' },
 }
 
-function ResultsBars({ ranking, colors }) {
+function ResultsBars({ ranking, onView, colors }) {
   const max = Math.max(1, ...ranking.map(r => r.votes))
   const total = ranking.reduce((s, r) => s + r.votes, 0)
   const winnerVotes = ranking[0]?.votes ?? 0
@@ -19,7 +19,7 @@ function ResultsBars({ ranking, colors }) {
       {ranking.map((r, i) => {
         const isWinner = r.votes === winnerVotes && winnerVotes > 0
         return (
-          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div key={r.id} onClick={() => onView(r)} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
             <span style={{
               width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
               background: isWinner ? colors.orange : colors.gray100,
@@ -196,15 +196,19 @@ function LiveResultsChart({ ranking, colors, totalVoters }) {
   )
 }
 
-function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, onEditProgram, colors, radius }) {
+function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, onEditProgram, onView, colors, radius }) {
   return (
-    <div style={{
-      padding: '14px 12px 12px', borderRadius: radius.lg, textAlign: 'center', position: 'relative',
-      border: `1px solid ${colors.gray100}`, background: colors.white,
-      transition: 'box-shadow 0.15s',
-    }}>
+    <div
+      onClick={onView}
+      style={{
+        padding: '14px 12px 12px', borderRadius: radius.lg, textAlign: 'center', position: 'relative',
+        border: `1px solid ${colors.gray100}`, background: colors.white,
+        transition: 'box-shadow 0.15s, transform 0.15s', cursor: 'pointer',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = theme.shadow.md; e.currentTarget.style.transform = 'translateY(-1px)' }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none' }}>
       {canEdit && (
-        <button onClick={onDelete} title="Supprimer ce candidat"
+        <button onClick={e => { e.stopPropagation(); onDelete() }} title="Supprimer ce candidat"
           style={{
             position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%', border: 'none',
             background: colors.errorBg, color: colors.errorText, cursor: 'pointer', fontSize: 13,
@@ -230,11 +234,11 @@ function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, o
             {candidate.program ? 'Programme reçu' : 'Programme en attente'}
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-            <button type="button" onClick={onEditProgram}
+            <button type="button" onClick={e => { e.stopPropagation(); onEditProgram() }}
               style={{ flex: 1, fontSize: 10.5, fontWeight: 600, color: colors.gray700, background: colors.gray100, border: 'none', borderRadius: 20, padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit' }}>
               Poste / programme
             </button>
-            <button type="button" onClick={onCopyLink} title="Copier le lien candidat"
+            <button type="button" onClick={e => { e.stopPropagation(); onCopyLink() }} title="Copier le lien candidat"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.green,
                 background: 'none', border: `1px solid ${colors.gray200}`, borderRadius: 20, padding: '4px 9px', cursor: 'pointer',
@@ -246,6 +250,40 @@ function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, o
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+/** Détail d'un candidat en lecture seule — ouvert en cliquant sur sa carte
+ * (grille admin ou barre de résultats), même contenu que ce qu'un votant
+ * verrait via "Voir le programme". */
+function CandidateDetailModal({ candidate, votes, onClose, colors, radius }) {
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 440 }}>
+        <div className="modal-header">
+          <div className="modal-title">Fiche candidat</div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
+          <img src={candidatePhotoUrl(candidate.photo_path)} alt={candidate.full_name}
+            style={{ width: 68, height: 68, borderRadius: '50%', objectFit: 'cover', background: colors.gray100, border: `3px solid ${colors.white}`, boxShadow: theme.shadow.md, flexShrink: 0 }} />
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: colors.gray900 }}>{candidate.full_name}</div>
+            <div style={{ fontSize: 12, color: colors.gray400, marginTop: 2 }}>{candidate.poste || 'Candidat'}</div>
+            {votes != null && <div style={{ fontSize: 12, color: colors.greenDark, fontWeight: 700, marginTop: 3 }}>{votes} voix</div>}
+          </div>
+        </div>
+        <div style={{
+          background: colors.gray50, border: `1px solid ${colors.gray100}`, borderRadius: radius.lg,
+          padding: '16px 18px', fontSize: 13.5, color: colors.gray700, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+          minHeight: 80,
+        }}>
+          {candidate.program?.trim() ? candidate.program : (
+            <span style={{ color: colors.gray400, fontStyle: 'italic' }}>Ce candidat n'a pas encore renseigné de programme.</span>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -286,13 +324,21 @@ function EmployeePicker({ value, onChange, colors, radius }) {
         }}>
           {results.map(u => (
             <button key={u.id} type="button"
-              onMouseDown={() => { onChange({ fullName: u.full_name, poste: u.poste ?? '' }); setOpen(false) }}
+              onMouseDown={() => {
+                onChange({ fullName: u.full_name, poste: u.poste ?? '', photoUrl: u.photo_path ?? '', photo: null })
+                setOpen(false)
+              }}
               style={{
-                display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px',
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px',
                 background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
               }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: colors.gray800 }}>{u.full_name}</div>
-              {u.poste && <div style={{ fontSize: 11, color: colors.gray400 }}>{u.poste}</div>}
+              {u.photo_path
+                ? <img src={u.photo_path} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                : <div style={{ width: 24, height: 24, borderRadius: '50%', background: colors.gray100, flexShrink: 0 }} />}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: colors.gray800 }}>{u.full_name}</div>
+                {u.poste && <div style={{ fontSize: 11, color: colors.gray400 }}>{u.poste}</div>}
+              </div>
             </button>
           ))}
         </div>
@@ -310,12 +356,13 @@ export default function VoteManage() {
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(true)
   const [candidateModal, setCandidateModal] = useState(null) // tourId
-  const [form, setForm] = useState({ fullName: '', poste: '', program: '', photo: null })
+  const [form, setForm] = useState({ fullName: '', poste: '', program: '', photo: null, photoUrl: '' })
   const [saving, setSaving] = useState(false)
   const [programModal, setProgramModal] = useState(null) // candidate
   const [programText, setProgramText] = useState('')
   const [posteText, setPosteText] = useState('')
   const [savingProgram, setSavingProgram] = useState(false)
+  const [viewCandidate, setViewCandidate] = useState(null) // { candidate, votes }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -350,12 +397,12 @@ export default function VoteManage() {
 
   async function handleAddCandidate(e) {
     e.preventDefault()
-    if (!form.fullName.trim() || !form.photo) return
+    if (!form.fullName.trim() || (!form.photo && !form.photoUrl)) return
     setSaving(true)
     try {
       await createCandidate(candidateModal, form)
       toast.success('Candidat ajouté.', 'Vote')
-      setForm({ fullName: '', poste: '', program: '', photo: null })
+      setForm({ fullName: '', poste: '', program: '', photo: null, photoUrl: '' })
       setCandidateModal(null)
       await load()
     } catch (err) {
@@ -458,7 +505,7 @@ export default function VoteManage() {
               </span>
               <div style={{ flex: 1 }} />
               {tour.status === 'UPCOMING' && (
-                <button className="btn btn-secondary btn-sm" onClick={() => { setForm({ fullName: '', program: '', photo: null }); setCandidateModal(tour.id) }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setForm({ fullName: '', poste: '', program: '', photo: null, photoUrl: '' }); setCandidateModal(tour.id) }}>
                   + Candidat
                 </button>
               )}
@@ -489,7 +536,7 @@ export default function VoteManage() {
                     Résultats en temps réel · rafraîchi toutes les 5s
                   </div>
                 )}
-                <ResultsBars ranking={ranking} colors={colors} />
+                <ResultsBars ranking={ranking} onView={r => setViewCandidate({ candidate: r, votes: r.votes })} colors={colors} />
                 {tour.status === 'ONGOING' && ranking.length > 0 && (
                   <LiveResultsChart ranking={ranking} colors={colors} totalVoters={vote.eligibleVoters ?? 0} />
                 )}
@@ -505,6 +552,7 @@ export default function VoteManage() {
                     onDelete={() => handleDeleteCandidate(c.id)}
                     onCopyLink={() => handleCopyLink(c)}
                     onEditProgram={() => openProgramModal(c)}
+                    onView={() => setViewCandidate({ candidate: c, votes: ranking.find(r => r.id === c.id)?.votes })}
                     colors={colors}
                     radius={radius}
                   />
@@ -547,12 +595,23 @@ export default function VoteManage() {
                 <textarea className="form-control" rows={2} value={form.program} onChange={e => setForm(f => ({ ...f, program: e.target.value }))} />
               </div>
               <div className="form-group">
-                <label className="form-label">Photo * (jpeg, png, webp — 4 Mo max)</label>
-                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setForm(f => ({ ...f, photo: e.target.files?.[0] ?? null }))} required />
+                <label className="form-label">Photo {!form.photoUrl && '*'} (jpeg, png, webp — 4 Mo max)</label>
+                {form.photoUrl && !form.photo ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <img src={form.photoUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
+                    <span style={{ fontSize: 12, color: colors.greenDark, fontWeight: 600 }}>Récupérée depuis Microsoft</span>
+                    <button type="button" onClick={() => setForm(f => ({ ...f, photoUrl: '' }))}
+                      style={{ fontSize: 11.5, color: colors.gray500, background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer' }}>
+                      Changer
+                    </button>
+                  </div>
+                ) : (
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setForm(f => ({ ...f, photo: e.target.files?.[0] ?? null, photoUrl: e.target.files?.[0] ? '' : f.photoUrl }))} required={!form.photoUrl} />
+                )}
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setCandidateModal(null)}>Annuler</button>
-                <button type="submit" className="btn btn-primary" disabled={saving || !form.fullName.trim() || !form.photo}>
+                <button type="submit" className="btn btn-primary" disabled={saving || !form.fullName.trim() || (!form.photo && !form.photoUrl)}>
                   {saving ? 'Ajout…' : 'Ajouter'}
                 </button>
               </div>
@@ -594,6 +653,16 @@ export default function VoteManage() {
             </form>
           </div>
         </div>
+      )}
+
+      {viewCandidate && (
+        <CandidateDetailModal
+          candidate={viewCandidate.candidate}
+          votes={viewCandidate.votes}
+          onClose={() => setViewCandidate(null)}
+          colors={colors}
+          radius={radius}
+        />
       )}
     </div>
   )

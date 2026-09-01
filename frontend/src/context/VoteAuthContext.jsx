@@ -36,7 +36,7 @@ export function VoteAuthProvider({ children }) {
 
   const signIn = useCallback(async (username, password) => {
     const data = await voteLogin({ username, password })
-    const profile = { role: data.role, fullName: data.fullName }
+    const profile = { role: data.role, fullName: data.fullName, poste: data.poste ?? '', photoPath: data.photoPath ?? '', mobilePhone: data.mobilePhone ?? '' }
     localStorage.setItem('vote_user', JSON.stringify(profile))
     dispatch({ type: 'SIGNED_IN', user: profile })
     return profile
@@ -45,6 +45,9 @@ export function VoteAuthProvider({ children }) {
   const signOut = useCallback(() => {
     voteLogout()
     localStorage.removeItem('vote_user')
+    // Une déconnexion explicite doit vraiment déconnecter — sans ça, "se
+    // souvenir de moi" reconnecterait silencieusement au chargement suivant.
+    localStorage.removeItem('vote_ms_remember')
     dispatch({ type: 'SIGNED_OUT' })
   }, [])
 

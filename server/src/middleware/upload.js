@@ -24,21 +24,22 @@ export const uploadCandidatePhoto = multer({
 }).single('photo')
 
 /** Envoie le buffer reçu vers Vercel Blob et retourne son URL publique
- * (stockée telle quelle dans candidates.photo_path). En dev local sans
- * BLOB_READ_WRITE_TOKEN, écrit sur disque et retourne une URL servie par
- * express.static (voir app.js) — évite de dépendre d'un compte Vercel Blob
- * juste pour développer en local. */
-export async function storeCandidatePhoto(file) {
+ * (stockée telle quelle dans candidates.photo_path / users.photo_path). En
+ * dev local sans BLOB_READ_WRITE_TOKEN, écrit sur disque et retourne une URL
+ * servie par express.static (voir app.js) — évite de dépendre d'un compte
+ * Vercel Blob juste pour développer en local. `folder` sépare juste les
+ * photos de candidats (upload admin) des photos de profil (Microsoft). */
+export async function storeCandidatePhoto(file, folder = 'candidates') {
   const filename = `${randomUUID()}${extname(file.originalname).toLowerCase()}`
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    const dir = join(LOCAL_UPLOADS_DIR, 'candidates')
+    const dir = join(LOCAL_UPLOADS_DIR, folder)
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, filename), file.buffer)
-    return `/api/uploads/candidates/${filename}`
+    return `/api/uploads/${folder}/${filename}`
   }
 
-  const blob = await put(`candidates/${filename}`, file.buffer, {
+  const blob = await put(`${folder}/${filename}`, file.buffer, {
     access: 'public',
     contentType: file.mimetype,
   })

@@ -1,16 +1,36 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { theme } from '../styles/theme.js'
 import { useVoteAuth } from '../context/VoteAuthContext.jsx'
+import { candidatePhotoUrl } from '../api/vote.js'
 
 function initialsOf(name) {
   const words = (name ?? '').trim().split(/\s+/)
   return ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase()
 }
 
+function Avatar({ user, size, colors }) {
+  const photo = candidatePhotoUrl(user?.photoPath)
+  if (photo) {
+    return <img src={photo} alt={user.fullName} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+  }
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: colors.greenLight, color: colors.greenDark,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.4, fontWeight: 700, flexShrink: 0,
+    }}>
+      {initialsOf(user?.fullName) || '?'}
+    </div>
+  )
+}
+
 export default function VoteLayout({ children }) {
-  const { colors } = theme
+  const { colors, radius } = theme
   const { user, signOut } = useVoteAuth()
   const isAdmin = user?.role === 'ADMIN_VOTE'
+  const [profileOpen, setProfileOpen] = useState(false)
 
   const linkStyle = ({ isActive }) => ({
     padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
@@ -63,24 +83,69 @@ export default function VoteLayout({ children }) {
 
           <div style={{ flex: 1 }} />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: '50%',
-              background: colors.greenLight, color: colors.greenDark,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 700, flexShrink: 0,
-            }}>
-              {initialsOf(user?.fullName) || '?'}
-            </div>
-            <span className="vote-header-username" style={{ fontSize: 12.5, color: colors.gray600, fontWeight: 500, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.fullName}
-            </span>
-            <button onClick={signOut} className="btn btn-secondary btn-sm vote-header-logout">
-              <span className="vote-header-logout-text">Déconnexion</span>
-              <svg className="vote-header-logout-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'none' }}>
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => setProfileOpen(o => !o)}
+              onBlur={() => setTimeout(() => setProfileOpen(false), 150)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                background: 'none', border: 'none', padding: '4px 6px', borderRadius: 10,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              <Avatar user={user} size={28} colors={colors} />
+              <span className="vote-header-username" style={{ fontSize: 12.5, color: colors.gray600, fontWeight: 500, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.fullName}
+              </span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={colors.gray400} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
+
+            {profileOpen && (
+              <div style={{
+                position: 'absolute', top: '100%', right: 0, marginTop: 8, width: 260, zIndex: 30,
+                background: colors.white, border: `1px solid ${colors.gray200}`, borderRadius: radius.lg,
+                boxShadow: theme.shadow.lg, overflow: 'hidden',
+                animation: 'fadeIn 0.15s ease',
+              }}>
+                <div style={{
+                  padding: '22px 18px 16px', textAlign: 'center',
+                  background: `linear-gradient(180deg, ${colors.greenLight} 0%, ${colors.white} 100%)`,
+                }}>
+                  <div style={{ display: 'inline-flex', padding: 3, borderRadius: '50%', background: colors.white, boxShadow: theme.shadow.sm }}>
+                    <Avatar user={user} size={60} colors={colors} />
+                  </div>
+                  <div style={{ fontSize: 14.5, fontWeight: 700, color: colors.gray900, marginTop: 10 }}>{user?.fullName}</div>
+                  {user?.poste && <div style={{ fontSize: 12, color: colors.gray500, marginTop: 1 }}>{user.poste}</div>}
+                  <span className={`badge ${isAdmin ? 'badge-purple' : 'badge-green'}`} style={{ marginTop: 8 }}>
+                    {isAdmin ? 'Administrateur' : 'Votant'}
+                  </span>
+                </div>
+
+                {user?.mobilePhone && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px',
+                    borderTop: `1px solid ${colors.gray100}`, fontSize: 12.5, color: colors.gray600,
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.gray400} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                    {user.mobilePhone}
+                  </div>
+                )}
+
+                <div style={{ padding: 14, borderTop: `1px solid ${colors.gray100}` }}>
+                  <button
+                    type="button"
+                    onClick={signOut}
+                    className="btn btn-secondary btn-sm"
+                    style={{ width: '100%', justifyContent: 'center' }}>
+                    Déconnexion
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
