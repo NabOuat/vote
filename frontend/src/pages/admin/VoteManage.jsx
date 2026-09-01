@@ -144,13 +144,21 @@ function EmployeePicker({ value, onChange, colors, radius }) {
         }}>
           {results.map(u => (
             <button key={u.id} type="button"
-              onMouseDown={() => { onChange({ fullName: u.full_name, poste: u.poste ?? '' }); setOpen(false) }}
+              onMouseDown={() => {
+                onChange({ fullName: u.full_name, poste: u.poste ?? '', photoUrl: u.photo_path ?? '', photo: null })
+                setOpen(false)
+              }}
               style={{
-                display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px',
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px',
                 background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
               }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: colors.gray800 }}>{u.full_name}</div>
-              {u.poste && <div style={{ fontSize: 11, color: colors.gray400 }}>{u.poste}</div>}
+              {u.photo_path
+                ? <img src={u.photo_path} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                : <div style={{ width: 24, height: 24, borderRadius: '50%', background: colors.gray100, flexShrink: 0 }} />}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: colors.gray800 }}>{u.full_name}</div>
+                {u.poste && <div style={{ fontSize: 11, color: colors.gray400 }}>{u.poste}</div>}
+              </div>
             </button>
           ))}
         </div>
@@ -168,7 +176,7 @@ export default function VoteManage() {
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(true)
   const [candidateModal, setCandidateModal] = useState(null) // tourId
-  const [form, setForm] = useState({ fullName: '', poste: '', program: '', photo: null })
+  const [form, setForm] = useState({ fullName: '', poste: '', program: '', photo: null, photoUrl: '' })
   const [saving, setSaving] = useState(false)
   const [programModal, setProgramModal] = useState(null) // candidate
   const [programText, setProgramText] = useState('')
@@ -192,12 +200,12 @@ export default function VoteManage() {
 
   async function handleAddCandidate(e) {
     e.preventDefault()
-    if (!form.fullName.trim() || !form.photo) return
+    if (!form.fullName.trim() || (!form.photo && !form.photoUrl)) return
     setSaving(true)
     try {
       await createCandidate(candidateModal, form)
       toast.success('Candidat ajouté.', 'Vote')
-      setForm({ fullName: '', poste: '', program: '', photo: null })
+      setForm({ fullName: '', poste: '', program: '', photo: null, photoUrl: '' })
       setCandidateModal(null)
       await load()
     } catch (err) {
@@ -300,7 +308,7 @@ export default function VoteManage() {
               </span>
               <div style={{ flex: 1 }} />
               {tour.status === 'UPCOMING' && (
-                <button className="btn btn-secondary btn-sm" onClick={() => { setForm({ fullName: '', program: '', photo: null }); setCandidateModal(tour.id) }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setForm({ fullName: '', poste: '', program: '', photo: null, photoUrl: '' }); setCandidateModal(tour.id) }}>
                   + Candidat
                 </button>
               )}
@@ -375,12 +383,23 @@ export default function VoteManage() {
                 <textarea className="form-control" rows={2} value={form.program} onChange={e => setForm(f => ({ ...f, program: e.target.value }))} />
               </div>
               <div className="form-group">
-                <label className="form-label">Photo * (jpeg, png, webp — 4 Mo max)</label>
-                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setForm(f => ({ ...f, photo: e.target.files?.[0] ?? null }))} required />
+                <label className="form-label">Photo {!form.photoUrl && '*'} (jpeg, png, webp — 4 Mo max)</label>
+                {form.photoUrl && !form.photo ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <img src={form.photoUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
+                    <span style={{ fontSize: 12, color: colors.greenDark, fontWeight: 600 }}>Récupérée depuis Microsoft</span>
+                    <button type="button" onClick={() => setForm(f => ({ ...f, photoUrl: '' }))}
+                      style={{ fontSize: 11.5, color: colors.gray500, background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer' }}>
+                      Changer
+                    </button>
+                  </div>
+                ) : (
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setForm(f => ({ ...f, photo: e.target.files?.[0] ?? null, photoUrl: e.target.files?.[0] ? '' : f.photoUrl }))} required={!form.photoUrl} />
+                )}
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setCandidateModal(null)}>Annuler</button>
-                <button type="submit" className="btn btn-primary" disabled={saving || !form.fullName.trim() || !form.photo}>
+                <button type="submit" className="btn btn-primary" disabled={saving || !form.fullName.trim() || (!form.photo && !form.photoUrl)}>
                   {saving ? 'Ajout…' : 'Ajouter'}
                 </button>
               </div>

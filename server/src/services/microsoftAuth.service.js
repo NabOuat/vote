@@ -102,3 +102,21 @@ export async function fetchJobTitle(accessToken) {
     return null
   }
 }
+
+/** Photo de profil depuis Microsoft Graph — best effort, comme
+ * fetchJobTitle : beaucoup de comptes n'en ont pas (Graph renvoie 404 dans
+ * ce cas, ce n'est pas une erreur). Renvoie null ou { buffer, contentType }. */
+export async function fetchProfilePhoto(accessToken) {
+  if (!accessToken) return null
+  try {
+    const res = await fetch('https://graph.microsoft.com/v1.0/me/photo/$value', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return null
+    const contentType = res.headers.get('content-type') ?? 'image/jpeg'
+    const buffer = Buffer.from(await res.arrayBuffer())
+    return { buffer, contentType }
+  } catch {
+    return null
+  }
+}

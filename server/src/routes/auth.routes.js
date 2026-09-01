@@ -3,7 +3,8 @@ import bcrypt from 'bcryptjs'
 import { db } from '../db.js'
 import { signToken } from '../middleware/auth.js'
 import { asyncHandler } from '../lib/asyncHandler.js'
-import { isMicrosoftLoginConfigured, buildAuthorizeUrl, generateState, wasSilentAttempt, exchangeCode, fetchJobTitle } from '../services/microsoftAuth.service.js'
+import { isMicrosoftLoginConfigured, buildAuthorizeUrl, generateState, wasSilentAttempt, exchangeCode, fetchJobTitle, fetchProfilePhoto } from '../services/microsoftAuth.service.js'
+import { storeCandidatePhoto } from '../middleware/upload.js'
 
 export const authRouter = Router()
 
@@ -22,7 +23,7 @@ authRouter.post('/login', asyncHandler(async (req, res) => {
   }
 
   const token = signToken(user)
-  res.json({ token, role: user.role, fullName: user.full_name })
+  res.json({ token, role: user.role, fullName: user.full_name, poste: user.poste ?? '', photoPath: user.photo_path ?? '' })
 }))
 
 /* ── Connexion Microsoft (Entra ID / Azure AD) ─────────────────────────
@@ -97,7 +98,22 @@ authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
     }
   }
 
+  // Idem pour la photo de profil — beaucoup de comptes n'en ont pas, dans ce
+  // cas fetchProfilePhoto renvoie simplement null et on ne touche à rien.
+  if (!user.photo_path) {
+    const photo = await fetchProfilePhoto(accessToken)
+    if (photo) {
+      const ext = photo.contentType.includes('png') ? '.png' : '.jpg'
+      const url = await storeCandidatePhoto({ buffer: photo.buffer, mimetype: photo.contentType, originalname: `profile${ext}` }, 'users')
+      await db.execute({ sql: 'UPDATE users SET photo_path = ? WHERE id = ?', args: [url, user.id] })
+      user.photo_path = url
+    }
+  }
+
   const token = signToken(user)
-  const params = new URLSearchParams({ token, role: user.role, fullName: user.full_name })
+  const params = new URLSearchParams({
+    token, role: user.role, fullName: user.full_name,
+    poste: user.poste ?? '', photoPath: user.photo_path ?? '',
+  })
   res.redirect(`${frontendBase}/auth/ms-callback?${params.toString()}`)
 }))

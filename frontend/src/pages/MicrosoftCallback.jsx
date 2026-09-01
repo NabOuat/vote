@@ -14,9 +14,11 @@ export default function MicrosoftCallback() {
     const token = params.get('token')
     const role = params.get('role')
     const fullName = params.get('fullName')
+    const poste = params.get('poste') ?? ''
+    const photoPath = params.get('photoPath') ?? ''
     if (token && role && fullName) {
       voteTokenStore.set(token)
-      localStorage.setItem('vote_user', JSON.stringify({ role, fullName }))
+      localStorage.setItem('vote_user', JSON.stringify({ role, fullName, poste, photoPath }))
     }
     window.location.replace('/')
   }, [params])

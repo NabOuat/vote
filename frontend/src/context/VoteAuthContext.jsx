@@ -36,7 +36,7 @@ export function VoteAuthProvider({ children }) {
 
   const signIn = useCallback(async (username, password) => {
     const data = await voteLogin({ username, password })
-    const profile = { role: data.role, fullName: data.fullName }
+    const profile = { role: data.role, fullName: data.fullName, poste: data.poste ?? '', photoPath: data.photoPath ?? '' }
     localStorage.setItem('vote_user', JSON.stringify(profile))
     dispatch({ type: 'SIGNED_IN', user: profile })
     return profile

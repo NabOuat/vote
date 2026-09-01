@@ -54,6 +54,9 @@ async function runMigrations() {
 
   // 004 — catégorie professionnelle (Cadre/Agent), renseignée par l'import Excel.
   await ensureColumn('users', 'category', 'TEXT')
+
+  // 005 — photo de profil récupérée depuis Microsoft Graph à la connexion.
+  await ensureColumn('users', 'photo_path', 'TEXT')
 }
 
 let migrated = null

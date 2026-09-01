@@ -186,11 +186,14 @@ async function handleCreateCandidate(req, res) {
   if (tour.status !== 'UPCOMING') {
     return res.status(409).json({ message: 'Impossible de modifier les candidats une fois le tour ouvert.' })
   }
-  const { fullName, poste, program } = req.body ?? {}
+  const { fullName, poste, program, photoUrl } = req.body ?? {}
   if (!fullName?.trim()) return res.status(400).json({ message: 'Le nom du candidat est requis.' })
-  if (!req.file) return res.status(400).json({ message: 'La photo est obligatoire.' })
+  // photoUrl : photo Microsoft déjà en Blob, réutilisée telle quelle depuis
+  // le sélecteur d'employé — pas besoin de la re-uploader. Sinon, un fichier
+  // est obligatoire (formulaire classique).
+  if (!req.file && !photoUrl?.trim()) return res.status(400).json({ message: 'La photo est obligatoire.' })
 
-  const photoPath = await storeCandidatePhoto(req.file)
+  const photoPath = req.file ? await storeCandidatePhoto(req.file) : photoUrl.trim()
   const editToken = randomUUID()
   const result = await db.execute({
     sql: 'INSERT INTO candidates (tour_id, full_name, poste, photo_path, program, edit_token) VALUES (?, ?, ?, ?, ?, ?)',
@@ -322,7 +325,7 @@ adminRouter.get('/users/search', asyncHandler(async (req, res) => {
   const q = (req.query.q ?? '').trim()
   if (q.length < 2) return res.json([])
   const { rows } = await db.execute({
-    sql: 'SELECT id, full_name, poste FROM users WHERE active = 1 AND full_name LIKE ? ORDER BY full_name LIMIT 20',
+    sql: 'SELECT id, full_name, poste, photo_path FROM users WHERE active = 1 AND full_name LIKE ? ORDER BY full_name LIMIT 20',
     args: [`%${q}%`],
   })
   res.json(rows)
