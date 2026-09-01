@@ -75,6 +75,18 @@ voterRouter.post('/tours/:tourId/ballot', asyncHandler(async (req, res) => {
   }
 }))
 
+/** Liste des votants de la MÊME catégorie que le votant connecté (pour
+ * transparence : chacun peut voir qui est dans son collège électoral). */
+voterRouter.get('/me/voters', asyncHandler(async (req, res) => {
+  const { rows: [me] } = await db.execute({ sql: 'SELECT category FROM users WHERE id = ?', args: [req.user.sub] })
+  const myCategory = me?.category ?? null
+  const { rows } = await db.execute({
+    sql: "SELECT id, full_name, poste, category FROM users WHERE role = 'VOTER' AND active = 1 AND (category = ? OR (? IS NULL AND category IS NULL)) ORDER BY full_name",
+    args: [myCategory, myCategory],
+  })
+  res.json(rows)
+}))
+
 /** Résultats d'un tour, uniquement si CE tour est clôturé et publié par l'admin. */
 voterRouter.get('/tours/:tourId/results', asyncHandler(async (req, res) => {
   const { rows: [tour] } = await db.execute({ sql: 'SELECT * FROM tours WHERE id = ?', args: [req.params.tourId] })

@@ -50,6 +50,8 @@ export const updateCandidateInfo = (candidateId, { program, poste }) => voteApiF
 /* ── Admin — votants ──────────────────────────────────────────────── */
 export const importVoters = (voters) => voteApiFetch('/admin/voters/import', { method: 'POST', body: JSON.stringify({ voters }) })
 export const searchUsers   = (q) => voteApiFetch(`/admin/users/search?q=${encodeURIComponent(q)}`)
+/** Liste tous les votants (role VOTER). Filtrage optionnel par catégorie. */
+export const listVoters    = (category) => voteApiFetch(`/admin/voters${category ? `?category=${encodeURIComponent(category)}` : ''}`)
 /** Supprime TOUS les votants (role VOTER), y compris ceux ayant déjà voté
  * (leurs vote_receipts sont supprimés avec eux). Action irréversible. Les
  * comptes ADMIN_VOTE ne sont jamais touchés. */
@@ -57,6 +59,7 @@ export const clearVoters = () => voteApiFetch('/admin/voters', { method: 'DELETE
 
 /* ── Votant ───────────────────────────────────────────────────────── */
 export const listMyVotes    = () => voteApiFetch('/me/votes')
+export const listMyVoters   = () => voteApiFetch('/me/voters')
 export const castBallot     = (tourId, candidateId) => voteApiFetch(`/tours/${tourId}/ballot`, { method: 'POST', body: JSON.stringify({ candidateId }) })
 export const getTourResults = (tourId) => voteApiFetch(`/tours/${tourId}/results`)
 
