@@ -5,6 +5,7 @@ import VoteLayout from './components/VoteLayout.jsx'
 import VoteLogin from './pages/VoteLogin.jsx'
 import VoterDashboard from './pages/VoterDashboard.jsx'
 import CandidateSelf from './pages/CandidateSelf.jsx'
+import MicrosoftCallback from './pages/MicrosoftCallback.jsx'
 import AdminSessions from './pages/admin/AdminSessions.jsx'
 import SessionDetail from './pages/admin/SessionDetail.jsx'
 import VoteManage from './pages/admin/VoteManage.jsx'
@@ -55,6 +56,17 @@ function Root() {
     return (
       <Routes>
         <Route path="/candidat/:candidateId" element={<CandidateSelf />} />
+      </Routes>
+    )
+  }
+
+  // Retour de la connexion Microsoft : traité avant tout, le JWT arrive en
+  // query string et doit être stocké avant que VoteAuthProvider ne décide
+  // quoi que ce soit (voir MicrosoftCallback.jsx).
+  if (location.pathname === '/auth/ms-callback') {
+    return (
+      <Routes>
+        <Route path="/auth/ms-callback" element={<MicrosoftCallback />} />
       </Routes>
     )
   }

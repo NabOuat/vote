@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { theme } from '../styles/theme.js'
 import { useVoteAuth } from '../context/VoteAuthContext.jsx'
 import { checkVoteBackendHealth } from '../api/vote.js'
@@ -79,9 +80,10 @@ const styleTag = `
 
 export default function VoteLogin() {
   const { signIn } = useVoteAuth()
+  const [searchParams] = useSearchParams()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState(searchParams.get('msError') ?? '')
   const [loading, setLoading] = useState(false)
   const [shake, setShake] = useState(false)
 
@@ -220,6 +222,27 @@ export default function VoteLogin() {
             {loading ? 'Connexion…' : 'Se connecter'}
           </button>
         </form>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.3)', fontSize: 11.5 }}>
+          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
+          ou
+          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
+        </div>
+
+        <a
+          href="/api/auth/microsoft/login"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            padding: '11px 16px', borderRadius: 12,
+            background: 'rgba(255,255,255,0.95)', color: '#1f2937',
+            fontSize: 13.5, fontWeight: 600, textDecoration: 'none',
+          }}>
+          <svg width="17" height="17" viewBox="0 0 21 21">
+            <rect x="1" y="1" width="9" height="9" fill="#f25022" /><rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+            <rect x="1" y="11" width="9" height="9" fill="#00a4ef" /><rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+          </svg>
+          Se connecter avec Microsoft
+        </a>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <BackendBadge />
