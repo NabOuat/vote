@@ -51,6 +51,9 @@ async function runMigrations() {
   // 003 — poste occupé, affiché à côté du nom (votants et candidats).
   await ensureColumn('users', 'poste', 'TEXT')
   await ensureColumn('candidates', 'poste', 'TEXT')
+
+  // 004 — catégorie professionnelle (Cadre/Agent), renseignée par l'import Excel.
+  await ensureColumn('users', 'category', 'TEXT')
 }
 
 let migrated = null
