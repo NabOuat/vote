@@ -5,14 +5,6 @@ import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { importVoters, clearVoters } from '../../api/vote.js'
 
-/** Format attendu, une ligne par votant : identifiant;nom complet;mot de passe;poste (le poste est optionnel) */
-function parseCsv(text) {
-  return text.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
-    const [username, fullName, password, poste] = line.split(';').map(s => s?.trim())
-    return { username, fullName, password, poste: poste || undefined }
-  })
-}
-
 /** Colonnes attendues (insensibles à la casse) : Username, Role, Fullname,
  * Category, Password (en clair, obligatoire — c'est le mot de passe de
  * connexion du votant). Mêmes règles que scripts/import-employees.mjs. */
@@ -56,8 +48,6 @@ function xlsxRowError(row) {
 export default function VotersImport() {
   const { colors } = theme
   const toast = useToast()
-  const [raw, setRaw] = useState('')
-  const [saving, setSaving] = useState(false)
   const [report, setReport] = useState(null)
 
   const fileInputRef = useRef(null)
@@ -82,26 +72,6 @@ export default function VotersImport() {
       toast.error(err.message ?? 'Erreur.', 'Erreur')
     } finally {
       setClearing(false)
-    }
-  }
-
-  async function handleImport(e) {
-    e.preventDefault()
-    const voters = parseCsv(raw)
-    if (voters.length === 0) {
-      toast.warning('Aucun votant valide détecté.', 'Import')
-      return
-    }
-    setSaving(true)
-    try {
-      const res = await importVoters(voters)
-      setReport(res)
-      toast.success(`${res.created.length} compte(s) créé(s).`, 'Import')
-      if (res.errors.length === 0) setRaw('')
-    } catch (err) {
-      toast.error(err.message ?? 'Erreur.', 'Erreur')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -151,7 +121,7 @@ export default function VotersImport() {
         <div>
           <Link to="/admin" style={{ fontSize: 12, color: colors.gray400 }}>← Sessions</Link>
           <div className="page-title" style={{ marginTop: 4 }}>Importer des votants</div>
-          <div className="page-sub">Depuis un fichier Excel, ou en collant une liste ligne par ligne</div>
+          <div className="page-sub">Depuis un fichier Excel</div>
         </div>
       </div>
 
@@ -234,26 +204,6 @@ export default function VotersImport() {
             </div>
           </>
         )}
-      </div>
-
-      <div className="card" style={{ marginTop: 16 }}>
-        <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 4 }}>Ou en collant une liste</div>
-        <div className="page-sub" style={{ marginBottom: 12 }}>Un votant par ligne : identifiant;nom complet;mot de passe;poste (poste optionnel)</div>
-        <form onSubmit={handleImport} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <textarea
-            className="form-control"
-            rows={10}
-            placeholder={'jdupont;Jean Dupont;MotDePasse123;Comptable\nmmartin;Marie Martin;MotDePasse456;Chef de projet'}
-            value={raw}
-            onChange={e => setRaw(e.target.value)}
-            style={{ fontFamily: 'monospace', fontSize: 13 }}
-          />
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="submit" className="btn btn-primary" disabled={saving || !raw.trim()}>
-              {saving ? 'Import…' : 'Importer'}
-            </button>
-          </div>
-        </form>
       </div>
 
       {report && (
