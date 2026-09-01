@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { VoteAuthProvider, useVoteAuth } from './context/VoteAuthContext.jsx'
 import VoteLayout from './components/VoteLayout.jsx'
+import WelcomePasswordModal from './components/WelcomePasswordModal.jsx'
 import VoteLogin from './pages/VoteLogin.jsx'
 import VoterDashboard from './pages/VoterDashboard.jsx'
 import CandidateSelf from './pages/CandidateSelf.jsx'
@@ -23,6 +25,7 @@ function Spinner() {
 function AuthedApp() {
   const { user } = useVoteAuth()
   const isAdmin = user.role === 'ADMIN_VOTE'
+  const [showWelcome, setShowWelcome] = useState(() => localStorage.getItem('vote_needs_password') === '1')
 
   return (
     <VoteLayout>
@@ -44,6 +47,9 @@ function AuthedApp() {
           </>
         )}
       </Routes>
+      {showWelcome && (
+        <WelcomePasswordModal fullName={user.fullName} onDone={() => setShowWelcome(false)} />
+      )}
     </VoteLayout>
   )
 }

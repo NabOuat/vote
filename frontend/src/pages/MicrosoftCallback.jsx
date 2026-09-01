@@ -19,6 +19,10 @@ export default function MicrosoftCallback() {
     if (token && role && fullName) {
       voteTokenStore.set(token)
       localStorage.setItem('vote_user', JSON.stringify({ role, fullName, poste, photoPath }))
+      // Première connexion Microsoft de ce compte → WelcomePasswordModal se
+      // charge de le proposer une fois arrivé dans l'app, puis nettoie ce
+      // marqueur (voir set-password / skip-password-setup côté backend).
+      if (params.get('needsPassword') === '1') localStorage.setItem('vote_needs_password', '1')
     }
     // TEMP DEBUG — à retirer : conserve le dump Microsoft brut (voir
     // auth.routes.js) pour que le widget profil propose de le télécharger.

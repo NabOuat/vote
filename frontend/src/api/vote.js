@@ -24,6 +24,11 @@ export function voteLogout() {
   voteTokenStore.clear()
 }
 
+/** Modal d'accueil à la première connexion Microsoft (voir VoteLayout.jsx /
+ * WelcomePasswordModal.jsx). */
+export const setPassword       = (password) => voteApiFetch('/auth/set-password', { method: 'POST', body: JSON.stringify({ password }) })
+export const skipPasswordSetup = () => voteApiFetch('/auth/skip-password-setup', { method: 'POST' })
+
 /* ── Admin — sessions & votes ─────────────────────────────────────── */
 export const listSessions        = () => voteApiFetch('/admin/sessions')
 export const createSession       = (data) => voteApiFetch('/admin/sessions', { method: 'POST', body: JSON.stringify(data) })

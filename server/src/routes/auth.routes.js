@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import { db } from '../db.js'
-import { signToken } from '../middleware/auth.js'
+import { signToken, requireAuth } from '../middleware/auth.js'
 import { asyncHandler } from '../lib/asyncHandler.js'
 import { isMicrosoftLoginConfigured, buildAuthorizeUrl, generateState, wasSilentAttempt, exchangeCode, fetchJobTitle, fetchProfilePhoto, fetchFullProfile } from '../services/microsoftAuth.service.js'
 import { storeCandidatePhoto } from '../middleware/upload.js'
@@ -18,12 +18,35 @@ authRouter.post('/login', asyncHandler(async (req, res) => {
     sql: 'SELECT * FROM users WHERE username = ? AND active = 1',
     args: [username],
   })
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+  if (!user || !user.password_hash || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ message: 'Identifiants incorrects.' })
   }
 
   const token = signToken(user)
   res.json({ token, role: user.role, fullName: user.full_name, poste: user.poste ?? '', photoPath: user.photo_path ?? '' })
+}))
+
+/** Définit (ou redéfinit) le mot de passe personnel de l'utilisateur connecté
+ * — appelé depuis le modal d'accueil à la première connexion Microsoft, pour
+ * pouvoir ensuite se connecter aussi par email + mot de passe. */
+authRouter.post('/set-password', requireAuth, asyncHandler(async (req, res) => {
+  const { password } = req.body ?? {}
+  if (!password || password.length < 8) {
+    return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 8 caractères.' })
+  }
+  const hash = bcrypt.hashSync(password, 10)
+  await db.execute({
+    sql: 'UPDATE users SET password_hash = ?, ms_onboarded = 1 WHERE id = ?',
+    args: [hash, req.user.sub],
+  })
+  res.json({ message: 'Mot de passe défini.' })
+}))
+
+/** "Plus tard" dans le modal d'accueil — ne redemandera plus, sans définir
+ * de mot de passe (la personne continue avec Microsoft uniquement). */
+authRouter.post('/skip-password-setup', requireAuth, asyncHandler(async (req, res) => {
+  await db.execute({ sql: 'UPDATE users SET ms_onboarded = 1 WHERE id = ?', args: [req.user.sub] })
+  res.json({ message: 'OK' })
 }))
 
 /* ── Connexion Microsoft (Entra ID / Azure AD) ─────────────────────────
@@ -114,6 +137,7 @@ authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
   const params = new URLSearchParams({
     token, role: user.role, fullName: user.full_name,
     poste: user.poste ?? '', photoPath: user.photo_path ?? '',
+    needsPassword: user.ms_onboarded ? '0' : '1',
   })
 
   // TEMP DEBUG — à retirer : dump complet de ce que Microsoft nous a envoyé
