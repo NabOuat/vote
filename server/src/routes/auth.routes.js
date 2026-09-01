@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import { db } from '../db.js'
 import { signToken } from '../middleware/auth.js'
 import { asyncHandler } from '../lib/asyncHandler.js'
-import { isMicrosoftLoginConfigured, buildAuthorizeUrl, generateState, exchangeCodeForEmail } from '../services/microsoftAuth.service.js'
+import { isMicrosoftLoginConfigured, buildAuthorizeUrl, generateState, exchangeCode, fetchJobTitle } from '../services/microsoftAuth.service.js'
 
 export const authRouter = Router()
 
@@ -63,9 +63,9 @@ authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
   if (!state || state !== cookies.ms_oauth_state) return fail('Requête invalide (état expiré ou incorrect) — réessaie.')
   res.setHeader('Set-Cookie', 'ms_oauth_state=; Path=/; HttpOnly; Max-Age=0')
 
-  let email
+  let email, accessToken
   try {
-    email = await exchangeCodeForEmail(code)
+    ;({ email, accessToken } = await exchangeCode(code))
   } catch (err) {
     return fail(err.message ?? 'Échec de la connexion Microsoft.')
   }
@@ -75,6 +75,17 @@ authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
     args: [email],
   })
   if (!user) return fail(`Aucun compte de vote associé à ${email}.`)
+
+  // Best effort : complète le poste depuis l'annuaire Microsoft s'il n'a
+  // jamais été renseigné (import Excel sans la colonne, ou candidat créé
+  // sans poste) — n'écrase jamais une valeur déjà saisie manuellement.
+  if (!user.poste) {
+    const jobTitle = await fetchJobTitle(accessToken)
+    if (jobTitle) {
+      await db.execute({ sql: 'UPDATE users SET poste = ? WHERE id = ?', args: [jobTitle, user.id] })
+      user.poste = jobTitle
+    }
+  }
 
   const token = signToken(user)
   const params = new URLSearchParams({ token, role: user.role, fullName: user.full_name })
