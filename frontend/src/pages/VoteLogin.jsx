@@ -78,6 +78,8 @@ const styleTag = `
 .vote-login-input:disabled { opacity: 0.6; }
 `
 
+const MS_REMEMBER_KEY = 'vote_ms_remember'
+
 export default function VoteLogin() {
   const { signIn } = useVoteAuth()
   const [searchParams] = useSearchParams()
@@ -86,6 +88,23 @@ export default function VoteLogin() {
   const [error, setError] = useState(searchParams.get('msError') ?? '')
   const [loading, setLoading] = useState(false)
   const [shake, setShake] = useState(false)
+  const [rememberMs, setRememberMs] = useState(() => localStorage.getItem(MS_REMEMBER_KEY) === '1')
+
+  // "Se souvenir de moi" coché la fois précédente + pas de retour d'échec
+  // silencieux (sinon boucle infinie de redirections) → retente la connexion
+  // Microsoft automatiquement, sans montrer le formulaire.
+  const silentFailed = searchParams.get('msSilentFailed') === '1'
+  const [autoAttempting, setAutoAttempting] = useState(rememberMs && !silentFailed && !searchParams.get('msError'))
+
+  useEffect(() => {
+    if (autoAttempting) window.location.href = '/api/auth/microsoft/login?silent=1'
+  }, [autoAttempting])
+
+  function handleRememberChange(e) {
+    const checked = e.target.checked
+    setRememberMs(checked)
+    localStorage.setItem(MS_REMEMBER_KEY, checked ? '1' : '0')
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -103,6 +122,20 @@ export default function VoteLogin() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (autoAttempting) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18,
+        background: `linear-gradient(155deg, #0f2e21 0%, #123a29 35%, ${theme.colors.greenDark} 75%, #0d2c1f 100%)`,
+        fontFamily: theme.font.family,
+      }}>
+        <style>{'@keyframes vote-spin { to { transform: rotate(360deg) } }'}</style>
+        <div style={{ width: 40, height: 40, border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff', borderRadius: '50%', animation: 'vote-spin 0.8s linear infinite' }} />
+        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13.5 }}>Connexion Microsoft en cours…</div>
+      </div>
+    )
   }
 
   return (
@@ -243,6 +276,19 @@ export default function VoteLogin() {
           </svg>
           Se connecter avec Microsoft
         </a>
+
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center',
+          fontSize: 12, color: 'rgba(255,255,255,0.55)', cursor: 'pointer', userSelect: 'none',
+        }}>
+          <input
+            type="checkbox"
+            checked={rememberMs}
+            onChange={handleRememberChange}
+            style={{ accentColor: theme.colors.green, width: 14, height: 14 }}
+          />
+          Se souvenir de moi (Microsoft)
+        </label>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <BackendBadge />

@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import { db } from '../db.js'
 import { signToken } from '../middleware/auth.js'
 import { asyncHandler } from '../lib/asyncHandler.js'
-import { isMicrosoftLoginConfigured, buildAuthorizeUrl, generateState, exchangeCode, fetchJobTitle } from '../services/microsoftAuth.service.js'
+import { isMicrosoftLoginConfigured, buildAuthorizeUrl, generateState, wasSilentAttempt, exchangeCode, fetchJobTitle } from '../services/microsoftAuth.service.js'
 
 export const authRouter = Router()
 
@@ -45,19 +45,29 @@ authRouter.get('/microsoft/login', (req, res) => {
   if (!isMicrosoftLoginConfigured()) {
     return res.status(503).json({ message: 'Connexion Microsoft non configurée sur ce déploiement.' })
   }
-  const state = generateState()
+  // ?silent=1 : déclenché automatiquement au chargement de la page si
+  // l'utilisateur a coché "Se souvenir de moi" la dernière fois — voir
+  // buildAuthorizeUrl pour ce que ça change côté Microsoft.
+  const silent = req.query.silent === '1'
+  const state = generateState(silent)
   res.setHeader('Set-Cookie', `ms_oauth_state=${state}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=300`)
-  res.redirect(buildAuthorizeUrl(state))
+  res.redirect(buildAuthorizeUrl(state, silent))
 })
 
 authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
   const frontendBase = `${req.protocol}://${req.get('host')}`
-  const fail = (message) => res.redirect(`${frontendBase}/?msError=${encodeURIComponent(message)}`)
+  const { code, state, error, error_description } = req.query
+  const silent = wasSilentAttempt(state)
+  // Une tentative silencieuse qui échoue (pas de session Microsoft active,
+  // ou compte non autorisé) ne doit jamais afficher de bandeau d'erreur —
+  // c'est un comportement attendu, pas une vraie erreur pour l'utilisateur.
+  // Il retombe silencieusement sur le formulaire de connexion classique.
+  const fail = (message) => res.redirect(
+    silent ? `${frontendBase}/?msSilentFailed=1` : `${frontendBase}/?msError=${encodeURIComponent(message)}`
+  )
 
   if (!isMicrosoftLoginConfigured()) return fail('Connexion Microsoft non configurée.')
-
-  const { code, state, error_description } = req.query
-  if (error_description) return fail(String(error_description))
+  if (error || error_description) return fail(String(error_description ?? error))
 
   const cookies = parseCookies(req.headers.cookie)
   if (!state || state !== cookies.ms_oauth_state) return fail('Requête invalide (état expiré ou incorrect) — réessaie.')

@@ -45,6 +45,9 @@ export function VoteAuthProvider({ children }) {
   const signOut = useCallback(() => {
     voteLogout()
     localStorage.removeItem('vote_user')
+    // Une déconnexion explicite doit vraiment déconnecter — sans ça, "se
+    // souvenir de moi" reconnecterait silencieusement au chargement suivant.
+    localStorage.removeItem('vote_ms_remember')
     dispatch({ type: 'SIGNED_OUT' })
   }, [])
 

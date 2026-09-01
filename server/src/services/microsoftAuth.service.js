@@ -21,8 +21,14 @@ export function isMicrosoftLoginConfigured() {
 
 /** URL vers laquelle rediriger l'utilisateur pour démarrer la connexion
  * Microsoft. `state` est un jeton anti-CSRF à vérifier au retour (voir
- * verifyState). */
-export function buildAuthorizeUrl(state) {
+ * generateState). `silent` pilote le comportement SSO :
+ *  - false (défaut, clic normal) → prompt=select_account : force l'écran de
+ *    choix de compte même si une session Microsoft est déjà active.
+ *  - true ("se souvenir de moi", déclenché automatiquement au chargement de
+ *    la page si l'utilisateur l'a coché la dernière fois) → prompt=none :
+ *    ne montre jamais d'interface Microsoft, réussit silencieusement si une
+ *    session valide existe, échoue immédiatement sinon (voir le callback). */
+export function buildAuthorizeUrl(state, silent) {
   const url = new URL(AUTHORIZE_ENDPOINT)
   url.searchParams.set('client_id', CLIENT_ID)
   url.searchParams.set('response_type', 'code')
@@ -30,15 +36,20 @@ export function buildAuthorizeUrl(state) {
   url.searchParams.set('response_mode', 'query')
   url.searchParams.set('scope', 'openid profile email User.Read')
   url.searchParams.set('state', state)
-  // Sans ça, le SSO du navigateur saute l'écran de connexion dès qu'une
-  // session Microsoft est déjà active — gênant sur un poste partagé, ou pour
-  // tester avec un autre compte. Force systématiquement le choix du compte.
-  url.searchParams.set('prompt', 'select_account')
+  url.searchParams.set('prompt', silent ? 'none' : 'select_account')
   return url.toString()
 }
 
-export function generateState() {
-  return randomBytes(24).toString('hex')
+/** Le préfixe encode si cette tentative était silencieuse ("se souvenir de
+ * moi") — round-trip via `state`, qu'Azure AD nous renvoie inchangé, pour
+ * que le callback sache comment réagir à un échec sans avoir besoin d'une
+ * session serveur (les fonctions Vercel sont sans état). */
+export function generateState(silent) {
+  return `${silent ? 's' : 'i'}:${randomBytes(24).toString('hex')}`
+}
+
+export function wasSilentAttempt(state) {
+  return typeof state === 'string' && state.startsWith('s:')
 }
 
 /** Échange le code d'autorisation contre un id_token (vérifié : signature,
