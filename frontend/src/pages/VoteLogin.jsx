@@ -198,7 +198,9 @@ export default function VoteLogin() {
             <label style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.65)' }}>Email</label>
             <input
               className="vote-login-input"
-              type="email"
+              type="text"
+              inputMode="email"
+              autoComplete="username"
               value={username}
               onChange={e => setUsername(e.target.value)}
               disabled={loading}
