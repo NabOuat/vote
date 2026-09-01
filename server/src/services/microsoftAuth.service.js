@@ -30,6 +30,10 @@ export function buildAuthorizeUrl(state) {
   url.searchParams.set('response_mode', 'query')
   url.searchParams.set('scope', 'openid profile email User.Read')
   url.searchParams.set('state', state)
+  // Sans ça, le SSO du navigateur saute l'écran de connexion dès qu'une
+  // session Microsoft est déjà active — gênant sur un poste partagé, ou pour
+  // tester avec un autre compte. Force systématiquement le choix du compte.
+  url.searchParams.set('prompt', 'select_account')
   return url.toString()
 }
 
