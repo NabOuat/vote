@@ -104,13 +104,13 @@ adminRouter.post('/sessions/:sessionId/votes', asyncHandler(async (req, res) => 
   const { rows: [session] } = await db.execute({ sql: 'SELECT * FROM sessions WHERE id = ?', args: [req.params.sessionId] })
   if (!session) return res.status(404).json({ message: 'Session introuvable.' })
 
-  const { label, roundsCount, tour1, tour2 } = req.body ?? {}
+  const { label, tour1, category } = req.body ?? {}
   if (!label?.trim()) return res.status(400).json({ message: 'Le libellé du vote est requis.' })
-  if (![1, 2].includes(roundsCount)) return res.status(400).json({ message: 'roundsCount doit être 1 ou 2.' })
+  // Le nombre de tours est désormais toujours 1 — plus de ballottage automatique.
+  const roundsCount = 1
   if (!tour1?.startsAt || !tour1?.endsAt) return res.status(400).json({ message: 'Période du tour 1 requise.' })
-  if (roundsCount === 2 && (!tour2?.startsAt || !tour2?.endsAt)) {
-    return res.status(400).json({ message: 'Période du tour 2 requise pour un vote à 2 tours (passage automatique).' })
-  }
+  // Catégorie d'éligibilité : 'Cadre', 'Agent' ou 'both' (tout le monde).
+  const voteCategory = ['Cadre', 'Agent', 'both'].includes(category) ? category : 'both'
   // Le tour 1 ne doit pas démarrer déjà passé — sinon il s'ouvre immédiatement,
   // avant même que des candidats aient pu être ajoutés (verrouillé une fois
   // ONGOING), ce qui bloque le vote sans recours possible depuis l'admin.
@@ -120,16 +120,13 @@ adminRouter.post('/sessions/:sessionId/votes', asyncHandler(async (req, res) => 
   if (new Date(tour1.endsAt) <= new Date(tour1.startsAt)) {
     return res.status(400).json({ message: 'La fin du tour 1 doit être postérieure à son début.' })
   }
-  if (roundsCount === 2 && new Date(tour2.startsAt) < new Date(tour1.endsAt)) {
-    return res.status(400).json({ message: 'Le tour 2 doit commencer après la fin du tour 1.' })
-  }
 
   const tx = await db.transaction('write')
   let voteId
   try {
     const vote = await tx.execute({
-      sql: 'INSERT INTO votes (session_id, label, rounds_count) VALUES (?, ?, ?)',
-      args: [session.id, label.trim(), roundsCount],
+      sql: 'INSERT INTO votes (session_id, label, rounds_count, category) VALUES (?, ?, ?, ?)',
+      args: [session.id, label.trim(), roundsCount, voteCategory],
     })
     voteId = vote.lastInsertRowid
 
@@ -137,12 +134,6 @@ adminRouter.post('/sessions/:sessionId/votes', asyncHandler(async (req, res) => 
       sql: 'INSERT INTO tours (vote_id, tour_number, starts_at, ends_at) VALUES (?, 1, ?, ?)',
       args: [voteId, tour1.startsAt, tour1.endsAt],
     })
-    if (roundsCount === 2) {
-      await tx.execute({
-        sql: 'INSERT INTO tours (vote_id, tour_number, starts_at, ends_at) VALUES (?, 2, ?, ?)',
-        args: [voteId, tour2.startsAt, tour2.endsAt],
-      })
-    }
     await tx.commit()
   } catch (err) {
     await tx.rollback()
@@ -163,7 +154,15 @@ async function getVoteDetail(voteId) {
     })
     return { ...t, candidates }
   }))
-  return { ...vote, tours: toursWithCandidates }
+  // Nombre de votants éligibles selon la catégorie du vote (pour le taux de
+  // participation affiché dans le suivi en temps réel côté admin).
+  const cat = vote.category ?? 'both'
+  const { rows: [{ n: eligibleVoters }] } = await db.execute(
+    cat === 'both'
+      ? { sql: "SELECT COUNT(*) as n FROM users WHERE role = 'VOTER'", args: [] }
+      : { sql: "SELECT COUNT(*) as n FROM users WHERE role = 'VOTER' AND category = ?", args: [cat] }
+  )
+  return { ...vote, tours: toursWithCandidates, eligibleVoters: Number(eligibleVoters) }
 }
 
 adminRouter.get('/votes/:voteId', asyncHandler(async (req, res) => {
@@ -329,10 +328,11 @@ adminRouter.get('/users/search', asyncHandler(async (req, res) => {
 }))
 
 /* ── Résultats & publication ──────────────────────────────────────────
- * Le dépouillement d'un tour n'est jamais exposé (même à l'admin) tant que ce
- * tour précis n'est pas CLOSED — "les résultats sont calculés à la clôture".
- * La publication est une action PAR TOUR (pas par vote) : publier le tour 1
- * ne doit jamais révéler un dépouillement en direct du tour 2 encore ouvert. */
+ * L'admin voit le dépouillement EN TEMPS RÉEL (même pendant ONGOING) pour
+ * suivre l'évolution du scrutin. La publication reste une action PAR TOUR
+ * (pas par vote) : publier le tour 1 ne doit jamais révéler un dépouillement
+ * en direct du tour 2 encore ouvert. Les votants, eux, ne voient les
+ * résultats qu'une fois le tour CLOSED ET publié (voir voter.routes.js). */
 adminRouter.get('/votes/:voteId/results', asyncHandler(async (req, res) => {
   const { rows: [vote] } = await db.execute({ sql: 'SELECT * FROM votes WHERE id = ?', args: [req.params.voteId] })
   if (!vote) return res.status(404).json({ message: 'Vote introuvable.' })
@@ -342,7 +342,9 @@ adminRouter.get('/votes/:voteId/results', asyncHandler(async (req, res) => {
     tourNumber: t.tour_number,
     status: t.status,
     publishedAt: t.results_published_at,
-    ranking: t.status === 'CLOSED' ? await tallyTour(t.id) : null,
+    // L'admin voit le classement dès qu'il y a des bulletins (ONGOING inclus).
+    // UPCOMING → null (aucun bulletin possible).
+    ranking: t.status === 'UPCOMING' ? null : await tallyTour(t.id),
   })))
   res.json({ voteId: vote.id, results })
 }))

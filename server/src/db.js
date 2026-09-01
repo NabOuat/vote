@@ -54,6 +54,10 @@ async function runMigrations() {
 
   // 004 — catégorie professionnelle (Cadre/Agent), renseignée par l'import Excel.
   await ensureColumn('users', 'category', 'TEXT')
+
+  // 005 — catégorie d'éligibilité d'un vote : 'Cadre', 'Agent' ou 'both'
+  // (tout le monde). NULL est traité comme 'both' pour les votes préexistants.
+  await ensureColumn('votes', 'category', "TEXT DEFAULT 'both'")
 }
 
 let migrated = null

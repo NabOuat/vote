@@ -11,13 +11,19 @@ export const voterRouter = Router()
 // n'importe quel VOTER.
 voterRouter.use(requireAuth, requireRole(['VOTER', 'ADMIN_VOTE']))
 
-/** Liste des votes (toutes sessions confondues) avec l'état de chaque tour pour ce votant. */
+/** Liste des votes (toutes sessions confondues) avec l'état de chaque tour pour ce votant.
+ * Ne renvoie que les votes ouverts à la catégorie professionnelle du votant
+ * (category = 'both' ou category = catégorie du votant). */
 voterRouter.get('/me/votes', asyncHandler(async (req, res) => {
+  const { rows: [voter] } = await db.execute({ sql: 'SELECT category FROM users WHERE id = ?', args: [req.user.sub] })
+  const voterCategory = voter?.category ?? null
+
   const { rows: votes } = await db.execute(`
     SELECT v.*, s.label as session_label FROM votes v
     JOIN sessions s ON s.id = v.session_id
+    WHERE v.category = 'both' OR v.category IS NULL OR v.category = ?
     ORDER BY v.created_at DESC
-  `)
+  `, [voterCategory])
 
   const payload = await Promise.all(votes.map(async (vote) => {
     const { rows: tours } = await db.execute({ sql: 'SELECT * FROM tours WHERE vote_id = ? ORDER BY tour_number', args: [vote.id] })
@@ -48,6 +54,7 @@ voterRouter.get('/me/votes', asyncHandler(async (req, res) => {
       sessionLabel: vote.session_label,
       label: vote.label,
       roundsCount: vote.rounds_count,
+      category: vote.category ?? 'both',
       tours: toursPayload,
     }
   }))

@@ -217,7 +217,7 @@ export default function VoterDashboard() {
                   border: `1px solid ${isOngoing ? 'rgba(33,168,99,0.25)' : colors.gray100}`,
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 700, fontSize: 13.5, color: colors.gray800 }}>Tour {tour.tourNumber}</span>
+                    <span style={{ fontWeight: 700, fontSize: 13.5, color: colors.gray800 }}>Candidats</span>
                     <span className={`badge ${st.badge}`}>{st.label}</span>
                     <span style={{ fontSize: 11.5, color: colors.gray400 }}>{tour.candidates.length} candidat{tour.candidates.length > 1 ? 's' : ''}</span>
                     <div style={{ flex: 1 }} />
@@ -244,7 +244,7 @@ export default function VoterDashboard() {
           <div className="modal" style={{ maxWidth: 580 }}>
             <div className="modal-header">
               <div className="modal-title">
-                {viewingCandidate ? 'Programme du candidat' : `Tour ${ballotModal.tourNumber} — choisissez un candidat`}
+                {viewingCandidate ? 'Programme du candidat' : 'Choisissez un candidat'}
               </div>
               <button className="modal-close" onClick={closeBallot} disabled={saving}>×</button>
             </div>
