@@ -4,24 +4,28 @@ import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { getSessionDetail, createVote } from '../../api/vote.js'
 
-const EMPTY_FORM = { label: '', roundsCount: 1, tour1Start: '', tour1End: '', tour2Start: '', tour2End: '' }
+const EMPTY_FORM = { label: '', category: 'both', tour1Start: '', tour1End: '' }
 
-function RoundsPicker({ value, onChange, colors, radius }) {
+const CATEGORIES = [
+  { value: 'both', label: 'Les deux', desc: 'Tous les votants (Cadre et Agent)' },
+  { value: 'Cadre', label: 'Cadre', desc: 'Réservé aux votants de catégorie Cadre' },
+  { value: 'Agent', label: 'Agent', desc: 'Réservé aux votants de catégorie Agent' },
+]
+
+function CategoryPicker({ value, onChange, colors, radius }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-      {[1, 2].map(n => {
-        const selected = value === n
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+      {CATEGORIES.map(c => {
+        const selected = value === c.value
         return (
-          <button key={n} type="button" onClick={() => onChange(n)}
+          <button key={c.value} type="button" onClick={() => onChange(c.value)}
             style={{
               padding: '12px 14px', borderRadius: radius.md, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
               border: `1.5px solid ${selected ? colors.green : colors.gray200}`,
               background: selected ? colors.greenLight : colors.white,
             }}>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: selected ? colors.greenDark : colors.gray800 }}>{n} tour{n > 1 ? 's' : ''}</div>
-            <div style={{ fontSize: 11, color: colors.gray500, marginTop: 2 }}>
-              {n === 1 ? 'Le plus de voix gagne' : 'Ballottage automatique si besoin'}
-            </div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: selected ? colors.greenDark : colors.gray800 }}>{c.label}</div>
+            <div style={{ fontSize: 11, color: colors.gray500, marginTop: 2 }}>{c.desc}</div>
           </button>
         )
       })}
@@ -49,14 +53,12 @@ export default function SessionDetail() {
   async function handleCreate(e) {
     e.preventDefault()
     if (!form.label.trim() || !form.tour1Start || !form.tour1End) return
-    if (form.roundsCount === 2 && (!form.tour2Start || !form.tour2End)) return
     setSaving(true)
     try {
       await createVote(sessionId, {
         label: form.label.trim(),
-        roundsCount: form.roundsCount,
+        category: form.category,
         tour1: { startsAt: new Date(form.tour1Start).toISOString(), endsAt: new Date(form.tour1End).toISOString() },
-        ...(form.roundsCount === 2 ? { tour2: { startsAt: new Date(form.tour2Start).toISOString(), endsAt: new Date(form.tour2End).toISOString() } } : {}),
       })
       toast.success('Vote créé.', 'Vote')
       setForm(EMPTY_FORM)
@@ -102,7 +104,7 @@ export default function SessionDetail() {
                 </svg>
               </div>
               <span style={{ fontWeight: 700, fontSize: 14, color: colors.gray900, flex: 1 }}>{v.label}</span>
-              <span className="badge badge-gray">{v.rounds_count} tour{v.rounds_count > 1 ? 's' : ''}</span>
+              <span className="badge badge-gray">{v.category && v.category !== 'both' ? v.category : 'Tous'}</span>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.gray300} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                 <polyline points="9 18 15 12 9 6" />
               </svg>
@@ -126,8 +128,8 @@ export default function SessionDetail() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Nombre de tours *</label>
-                <RoundsPicker value={form.roundsCount} onChange={n => setForm(f => ({ ...f, roundsCount: n }))} colors={colors} radius={theme.radius} />
+                <label className="form-label">Catégorie d'éligibilité *</label>
+                <CategoryPicker value={form.category} onChange={c => setForm(f => ({ ...f, category: c }))} colors={colors} radius={theme.radius} />
               </div>
 
               <div style={{ background: colors.gray50, borderRadius: theme.radius.lg, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -136,7 +138,7 @@ export default function SessionDetail() {
                     width: 20, height: 20, borderRadius: '50%', background: colors.green, color: '#fff',
                     fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   }}>1</span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.gray700, textTransform: 'uppercase', letterSpacing: '.03em' }}>Tour 1</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.gray700, textTransform: 'uppercase', letterSpacing: '.03em' }}>Tour unique</span>
                 </div>
                 <div className="date-range-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div className="form-group">
@@ -154,31 +156,6 @@ export default function SessionDetail() {
                   Doit démarrer au moins 5 minutes dans le futur, le temps d'ajouter les candidats.
                 </div>
               </div>
-
-              {form.roundsCount === 2 && (
-                <div style={{ background: colors.orangeLight, borderRadius: theme.radius.lg, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{
-                      width: 20, height: 20, borderRadius: '50%', background: colors.orange, color: '#fff',
-                      fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>2</span>
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.orangeDark, textTransform: 'uppercase', letterSpacing: '.03em' }}>Tour 2</span>
-                    <span style={{ fontSize: 11, color: colors.gray500 }}>(déclenché automatiquement)</span>
-                  </div>
-                  <div className="date-range-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div className="form-group">
-                      <label className="form-label">Début *</label>
-                      <input type="datetime-local" className="form-control" value={form.tour2Start}
-                        onChange={e => setForm(f => ({ ...f, tour2Start: e.target.value }))} required />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Fin *</label>
-                      <input type="datetime-local" className="form-control" value={form.tour2End}
-                        onChange={e => setForm(f => ({ ...f, tour2End: e.target.value }))} required />
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Annuler</button>

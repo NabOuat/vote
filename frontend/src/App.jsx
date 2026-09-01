@@ -12,6 +12,7 @@ import AdminSessions from './pages/admin/AdminSessions.jsx'
 import SessionDetail from './pages/admin/SessionDetail.jsx'
 import VoteManage from './pages/admin/VoteManage.jsx'
 import VotersImport from './pages/admin/VotersImport.jsx'
+import VotersList from './pages/admin/VotersList.jsx'
 
 function Spinner() {
   return (
@@ -34,6 +35,7 @@ function AuthedApp() {
           <>
             <Route path="/admin"                     element={<AdminSessions />} />
             <Route path="/admin/voters"               element={<VotersImport />} />
+            <Route path="/admin/voters/list"          element={<VotersList />} />
             <Route path="/admin/sessions/:sessionId"  element={<SessionDetail />} />
             <Route path="/admin/votes/:voteId"        element={<VoteManage />} />
             {/* Les comptes RH sont aussi votants — ils gardent accès à leur propre bulletin. */}
@@ -43,6 +45,7 @@ function AuthedApp() {
         ) : (
           <>
             <Route path="/" element={<VoterDashboard />} />
+            <Route path="/ma-liste" element={<VotersList />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         )}

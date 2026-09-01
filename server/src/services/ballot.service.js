@@ -19,6 +19,15 @@ export async function castBallot({ tourId, voterId, candidateId }) {
   if (!tour) throw new BallotError(404, 'Tour introuvable.')
   if (tour.status !== 'ONGOING') throw new BallotError(409, "Ce tour n'est pas ouvert au vote.")
 
+  // Vérifie l'éligibilité du votant selon la catégorie du vote.
+  const { rows: [vote] } = await db.execute({ sql: 'SELECT category FROM votes WHERE id = ?', args: [tour.vote_id] })
+  if (vote?.category && vote.category !== 'both') {
+    const { rows: [voter] } = await db.execute({ sql: 'SELECT category FROM users WHERE id = ?', args: [voterId] })
+    if (voter?.category && voter.category !== vote.category) {
+      throw new BallotError(403, `Ce vote est réservé à la catégorie ${vote.category}.`)
+    }
+  }
+
   const { rows: [candidate] } = await db.execute({
     sql: 'SELECT id FROM candidates WHERE id = ? AND tour_id = ?',
     args: [candidateId, tourId],

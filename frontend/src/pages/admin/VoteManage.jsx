@@ -54,6 +54,148 @@ function ResultsBars({ ranking, onView, colors }) {
   )
 }
 
+/** Palette de couleurs pour le graphique et le camembert. */
+const CHART_COLORS = ['#21a863', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316']
+
+/** Graphique en barres verticales (style "live chart") avec axes et labels. */
+function LiveBarChart({ ranking, colors }) {
+  const total = ranking.reduce((s, r) => s + r.votes, 0)
+  const max = Math.max(1, ...ranking.map(r => r.votes))
+  const chartH = 200
+  const barW = 48
+  const gap = 24
+  const labelH = 50
+  const axisW = 36
+  const svgW = axisW + ranking.length * (barW + gap) + gap
+  const svgH = chartH + labelH + 20
+  // Graduations Y
+  const ticks = [0, Math.ceil(max / 2), max]
+  return (
+    <svg width={svgW} height={svgH} style={{ display: 'block', maxWidth: '100%' }}>
+      {/* Lignes horizontales + graduations */}
+      {ticks.map((t, i) => {
+        const y = chartH - (t / max) * chartH + 10
+        return (
+          <g key={i}>
+            <line x1={axisW} y1={y} x2={svgW - gap / 2} y2={y} stroke={colors.gray100} strokeWidth={1} />
+            <text x={axisW - 6} y={y + 3} textAnchor="end" fontSize={10} fill={colors.gray400}>{t}</text>
+          </g>
+        )
+      })}
+      {/* Barres */}
+      {ranking.map((r, i) => {
+        const h = (r.votes / max) * chartH
+        const x = axisW + gap / 2 + i * (barW + gap)
+        const y = chartH - h + 10
+        const color = CHART_COLORS[i % CHART_COLORS.length]
+        const pct = total > 0 ? Math.round((r.votes / total) * 100) : 0
+        return (
+          <g key={r.id}>
+            <rect x={x} y={y} width={barW} height={h} rx={6} fill={color} opacity={0.9}
+              style={{ transition: 'all 0.5s ease' }} />
+            <text x={x + barW / 2} y={y - 6} textAnchor="middle" fontSize={12} fontWeight={700} fill={colors.gray800}>
+              {r.votes}
+            </text>
+            <text x={x + barW / 2} y={y - 20} textAnchor="middle" fontSize={10} fill={colors.gray400}>
+              {pct}%
+            </text>
+            {/* Label nom sous la barre */}
+            <foreignObject x={x - 6} y={chartH + 16} width={barW + 12} height={labelH}>
+              <div style={{ textAlign: 'center', fontSize: 10, color: colors.gray600, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {r.full_name}
+              </div>
+            </foreignObject>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+/** Camembert (donut) en SVG pur montrant la répartition des voix. */
+function LiveDonut({ ranking, colors }) {
+  const total = ranking.reduce((s, r) => s + r.votes, 0)
+  const size = 200
+  const cx = size / 2, cy = size / 2, r = 80, strokeW = 32
+  if (total === 0) {
+    return (
+      <div style={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.gray400, fontSize: 12 }}>
+        Aucun vote pour l'instant
+      </div>
+    )
+  }
+  const circ = 2 * Math.PI * r
+  let offset = 0
+  const segments = ranking.map((c, i) => {
+    const frac = c.votes / total
+    const len = frac * circ
+    const seg = {
+      color: CHART_COLORS[i % CHART_COLORS.length],
+      dasharray: `${len} ${circ - len}`,
+      dashoffset: -offset,
+      name: c.full_name,
+      votes: c.votes,
+      pct: Math.round(frac * 100),
+    }
+    offset += len
+    return seg
+  })
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+      <svg width={size} height={size} style={{ flexShrink: 0 }}>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={colors.gray100} strokeWidth={strokeW} />
+        {segments.map((s, i) => (
+          <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={s.color} strokeWidth={strokeW}
+            strokeDasharray={s.dasharray} strokeDashoffset={s.dashoffset}
+            transform={`rotate(-90 ${cx} ${cy})`}
+            style={{ transition: 'all 0.5s ease' }} />
+        ))}
+        <text x={cx} y={cy - 4} textAnchor="middle" fontSize={26} fontWeight={800} fill={colors.gray900}>{total}</text>
+        <text x={cx} y={cy + 14} textAnchor="middle" fontSize={11} fill={colors.gray400}>bulletin{total > 1 ? 's' : ''}</text>
+      </svg>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 140 }}>
+        {segments.map((s, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: colors.gray700, fontWeight: 600 }}>{s.name}</span>
+            <span style={{ color: colors.gray500, flexShrink: 0 }}>{s.pct}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Carte "Suivi en temps réel" : barres verticales + camembert côte à côte. */
+function LiveResultsChart({ ranking, colors, totalVoters }) {
+  const total = ranking.reduce((s, r) => s + r.votes, 0)
+  const sorted = [...ranking].sort((a, b) => b.votes - a.votes)
+  const participation = totalVoters > 0 ? Math.round((total / totalVoters) * 100) : 0
+  return (
+    <div style={{
+      marginTop: 20, padding: 20, borderRadius: 14,
+      background: colors.gray50, border: `1px solid ${colors.gray100}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: colors.gray900 }}>Suivi en temps réel</div>
+        <div style={{ display: 'flex', gap: 12, fontSize: 12, color: colors.gray500 }}>
+          <span><strong style={{ color: colors.gray800 }}>{total}</strong> bulletin{total > 1 ? 's' : ''}</span>
+          <span>·</span>
+          <span>Participation : <strong style={{ color: colors.greenDark }}>{participation}%</strong></span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ flex: '1 1 320px', minWidth: 280, overflowX: 'auto' }}>
+          <LiveBarChart ranking={sorted} colors={colors} />
+        </div>
+        <div style={{ flex: '0 0 auto' }}>
+          <LiveDonut ranking={sorted} colors={colors} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CandidateAdminCard({ candidate, votes, canEdit, onDelete, onCopyLink, onEditProgram, onView, colors, radius }) {
   return (
     <div
@@ -237,6 +379,22 @@ export default function VoteManage() {
 
   useEffect(() => { load() }, [load])
 
+  // Rafraîchissement automatique des résultats toutes les 5s tant qu'au moins
+  // un tour est ONGOING (suivi en temps réel pour l'admin).
+  useEffect(() => {
+    if (!vote) return
+    const hasOngoing = vote.tours.some(t => t.status === 'ONGOING')
+    if (!hasOngoing) return
+    const id = setInterval(async () => {
+      try {
+        const [v, r] = await Promise.all([getVoteDetail(voteId), getVoteResultsAdmin(voteId)])
+        setVote(v)
+        setResults(r)
+      } catch { /* ignore — on réessaiera au prochain tick */ }
+    }, 5000)
+    return () => clearInterval(id)
+  }, [vote, voteId])
+
   async function handleAddCandidate(e) {
     e.preventDefault()
     if (!form.fullName.trim() || (!form.photo && !form.photoUrl)) return
@@ -340,7 +498,7 @@ export default function VoteManage() {
           return (
           <div key={tour.id} className="card">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-              <div style={{ fontWeight: 700, fontSize: 14.5, color: colors.gray900 }}>Tour {tour.tour_number}</div>
+              <div style={{ fontWeight: 700, fontSize: 14.5, color: colors.gray900 }}>Candidats</div>
               <span className={`badge ${st.badge}`}>{st.label}</span>
               <span style={{ fontSize: 11.5, color: colors.gray400 }}>
                 {new Date(tour.starts_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })} → {new Date(tour.ends_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}
@@ -367,8 +525,22 @@ export default function VoteManage() {
               )}
             </div>
 
-            {tour.status === 'CLOSED' && ranking.length > 0 ? (
-              <ResultsBars ranking={ranking} onView={r => setViewCandidate({ candidate: r, votes: r.votes })} colors={colors} />
+            {(tour.status === 'CLOSED' || tour.status === 'ONGOING') && ranking.length > 0 ? (
+              <>
+                {tour.status === 'ONGOING' && (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: colors.greenDark,
+                    background: colors.greenLight, borderRadius: 20, padding: '3px 10px', marginBottom: 12,
+                  }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: colors.green, animation: 'pulse 1.5s infinite' }} />
+                    Résultats en temps réel · rafraîchi toutes les 5s
+                  </div>
+                )}
+                <ResultsBars ranking={ranking} onView={r => setViewCandidate({ candidate: r, votes: r.votes })} colors={colors} />
+                {tour.status === 'ONGOING' && ranking.length > 0 && (
+                  <LiveResultsChart ranking={ranking} colors={colors} totalVoters={vote.eligibleVoters ?? 0} />
+                )}
+              </>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
                 {tour.candidates.map(c => (
