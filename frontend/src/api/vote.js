@@ -76,6 +76,7 @@ export const updateUserRole = (userId, role) => voteApiFetch(`/admin/users/${use
 /** Suppression de compte et réinitialisation de mot de passe — réservées aux super-admins. */
 export const deleteUserAccount    = (userId) => voteApiFetch(`/admin/users/${userId}`, { method: 'DELETE' })
 export const resetUserPassword    = (userId, password) => voteApiFetch(`/admin/users/${userId}/password`, { method: 'PUT', body: JSON.stringify({ password }) })
+export const renameUserAccount    = (userId, fullName) => voteApiFetch(`/admin/users/${userId}/name`, { method: 'PUT', body: JSON.stringify({ fullName }) })
 
 /* ── Statistiques de connexion — accessibles à tout admin ─────────────── */
 export const getConnectionStats = (page = 1) => voteApiFetch(`/admin/stats?page=${page}`)

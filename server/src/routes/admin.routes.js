@@ -414,6 +414,19 @@ adminRouter.put('/users/:userId/password', requireSuperAdmin, asyncHandler(async
   res.json({ message: 'Mot de passe réinitialisé.' })
 }))
 
+/** Correction du nom complet d'un compte par un super-admin — utile pour
+ * réparer une erreur de saisie lors d'un import (ex. mauvaise colonne
+ * copiée-collée). */
+adminRouter.put('/users/:userId/name', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const { fullName } = req.body ?? {}
+  if (!fullName?.trim()) return res.status(400).json({ message: 'Le nom complet est requis.' })
+  const userId = Number(req.params.userId)
+  const { rows: [target] } = await db.execute({ sql: 'SELECT id FROM users WHERE id = ?', args: [userId] })
+  if (!target) return res.status(404).json({ message: 'Compte introuvable.' })
+  await db.execute({ sql: 'UPDATE users SET full_name = ? WHERE id = ?', args: [fullName.trim(), userId] })
+  res.json({ message: 'Nom mis à jour.' })
+}))
+
 /** Statistiques de connexion — accessibles à tout admin (ADMIN_VOTE ou
  * SUPER_ADMIN), pas réservées aux super-admins : chaque admin doit pouvoir
  * suivre le taux de connexion des votants dont il a la charge. */

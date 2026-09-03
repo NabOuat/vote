@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useVoteAuth } from '../../context/VoteAuthContext.jsx'
-import { listAdmins, updateUserRole, searchUsers, deleteUserAccount, resetUserPassword } from '../../api/vote.js'
+import { listAdmins, updateUserRole, searchUsers, deleteUserAccount, resetUserPassword, renameUserAccount } from '../../api/vote.js'
 
 const ROLE_LABELS = {
   SUPER_ADMIN: { label: 'Super Admin', badge: 'badge-purple' },
@@ -116,6 +116,45 @@ function ResetPasswordModal({ target, onClose, onConfirm, saving }) {
   )
 }
 
+/** Modal de correction du nom complet d'un compte — utile pour réparer une
+ * erreur de saisie venue d'un import Excel (ex. mauvaise colonne copiée). */
+function RenameModal({ target, onClose, onConfirm, saving }) {
+  const { colors } = theme
+  const [fullName, setFullName] = useState(target.full_name)
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 420 }}>
+        <div className="modal-header">
+          <div className="modal-title">Corriger le nom</div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div style={{ fontSize: 13, color: colors.gray500, marginBottom: 12 }}>
+          Nom complet pour <b style={{ color: colors.gray800 }}>{target.username}</b>.
+        </div>
+        <div className="form-group">
+          <input
+            className="form-control"
+            type="text"
+            value={fullName}
+            onChange={e => setFullName(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Annuler</button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={saving || !fullName.trim() || fullName.trim() === target.full_name}
+            onClick={() => onConfirm(fullName.trim())}>
+            {saving ? 'Enregistrement…' : 'Renommer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminManagement() {
   const { colors, radius } = theme
   const toast = useToast()
@@ -125,6 +164,8 @@ export default function AdminManagement() {
   const [updating, setUpdating] = useState(null) // userId en cours de modification
   const [resetTarget, setResetTarget] = useState(null)
   const [resetSaving, setResetSaving] = useState(false)
+  const [renameTarget, setRenameTarget] = useState(null)
+  const [renameSaving, setRenameSaving] = useState(false)
   const [manageTarget, setManageTarget] = useState(null)
 
   const load = useCallback(async () => {
@@ -180,6 +221,20 @@ export default function AdminManagement() {
     }
   }
 
+  async function handleRename(fullName) {
+    setRenameSaving(true)
+    try {
+      await renameUserAccount(renameTarget.id, fullName)
+      toast.success(`Renommé en "${fullName}".`, 'Nom mis à jour')
+      setRenameTarget(null)
+      await load()
+    } catch (err) {
+      toast.error(err.message ?? 'Erreur.', 'Erreur')
+    } finally {
+      setRenameSaving(false)
+    }
+  }
+
   return (
     <div style={{ maxWidth: 800 }}>
       <div className="page-header">
@@ -215,7 +270,11 @@ export default function AdminManagement() {
               <div style={{ fontSize: 13, fontWeight: 700, color: colors.gray800 }}>{manageTarget.full_name}</div>
               <div style={{ fontSize: 11, color: colors.gray400 }}>{manageTarget.username}</div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn-secondary" style={{ fontSize: 12.5, padding: '6px 12px' }}
+                onClick={() => { setRenameTarget(manageTarget); setManageTarget(null) }}>
+                Corriger le nom
+              </button>
               <button type="button" className="btn btn-secondary" style={{ fontSize: 12.5, padding: '6px 12px' }}
                 onClick={() => { setResetTarget(manageTarget); setManageTarget(null) }}>
                 Réinitialiser mot de passe
@@ -289,6 +348,15 @@ export default function AdminManagement() {
           saving={resetSaving}
           onClose={() => setResetTarget(null)}
           onConfirm={handleResetPassword}
+        />
+      )}
+
+      {renameTarget && (
+        <RenameModal
+          target={renameTarget}
+          saving={renameSaving}
+          onClose={() => setRenameTarget(null)}
+          onConfirm={handleRename}
         />
       )}
     </div>
