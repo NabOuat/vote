@@ -437,7 +437,8 @@ adminRouter.get('/stats', asyncHandler(async (req, res) => {
   const currentPage = Math.min(page, pageCount)
   const { rows: users } = await db.execute({
     sql: `
-      SELECT id, username, full_name, role, category, poste, last_login_at, last_login_location
+      SELECT id, username, full_name, role, category, poste, last_login_at, last_login_location,
+        EXISTS(SELECT 1 FROM vote_receipts WHERE voter_id = users.id) AS has_voted
       FROM users WHERE active = 1
       ORDER BY (last_login_at IS NULL), last_login_at DESC, full_name
       LIMIT ? OFFSET ?

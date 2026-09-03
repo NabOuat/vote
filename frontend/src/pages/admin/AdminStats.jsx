@@ -93,23 +93,37 @@ export default function AdminStats() {
       </div>
 
       {stats.byCategory.length > 0 && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 12 }}>Par catégorie</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {stats.byCategory.map(c => {
-              const pct = c.total > 0 ? Math.round((c.connected / c.total) * 100) : 0
-              return (
-                <div key={c.category}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 600, color: colors.gray700 }}>{c.category}</span>
-                    <span style={{ color: colors.gray400 }}>{c.connected} / {c.total} ({pct}%)</span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+          <div className="card" style={{ padding: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 10 }}>Par catégorie</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {stats.byCategory.map(c => {
+                const pct = c.total > 0 ? Math.round((c.connected / c.total) * 100) : 0
+                return (
+                  <div key={c.category}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 3 }}>
+                      <span style={{ fontWeight: 600, color: colors.gray700 }}>{c.category}</span>
+                      <span style={{ color: colors.gray400 }}>{c.connected} / {c.total} ({pct}%)</span>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 4, background: colors.gray100, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: colors.green, borderRadius: 4 }} />
+                    </div>
                   </div>
-                  <div style={{ height: 8, borderRadius: 4, background: colors.gray100, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: colors.green, borderRadius: 4 }} />
-                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 10 }}>Effectifs par catégorie</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {stats.byCategory.map(c => (
+                <div key={c.category} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5 }}>
+                  <span style={{ fontWeight: 600, color: colors.gray700 }}>{c.category}</span>
+                  <span style={{ fontWeight: 800, color: colors.gray900 }}>{c.total}</span>
                 </div>
-              )
-            })}
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -123,6 +137,7 @@ export default function AdminStats() {
               <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase' }} className="hide-mobile">Email</th>
               <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase' }}>Rôle</th>
               <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase' }} className="hide-mobile">Lieu</th>
+              <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase' }}>A voté</th>
               <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase' }}>Dernière connexion</th>
             </tr>
           </thead>
@@ -137,13 +152,18 @@ export default function AdminStats() {
                 <td style={{ padding: '10px 14px', color: u.last_login_location ? colors.gray600 : colors.gray300 }} className="hide-mobile">
                   {u.last_login_location ?? '—'}
                 </td>
+                <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                  {u.has_voted
+                    ? <span className="badge badge-green">Oui</span>
+                    : <span className="badge badge-gray">Non</span>}
+                </td>
                 <td style={{ padding: '10px 14px', textAlign: 'right', color: u.last_login_at ? colors.gray700 : colors.gray300 }}>
                   {formatDate(u.last_login_at) ?? 'Jamais connecté'}
                 </td>
               </tr>
             ))}
             {stats.users.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: colors.gray400 }}>Aucun compte.</td></tr>
+              <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: colors.gray400 }}>Aucun compte.</td></tr>
             )}
           </tbody>
         </table>
