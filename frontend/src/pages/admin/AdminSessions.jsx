@@ -58,7 +58,6 @@ export default function AdminSessions() {
           <div className="page-sub">Organisez des élections comprenant un ou plusieurs votes</div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <Link to="/admin/voters" className="btn btn-secondary">Importer des votants</Link>
           <button className="btn btn-primary" onClick={() => setModalOpen(true)}>+ Nouvelle élection</button>
         </div>
       </div>

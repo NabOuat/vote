@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
 import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useVoteAuth } from '../../context/VoteAuthContext.jsx'
@@ -108,11 +107,6 @@ export default function VotersList() {
           <div className="page-title">{title}</div>
           <div className="page-sub">{counts.total} compte{counts.total > 1 ? 's' : ''}{isAdmin && ` · ${counts.Cadre} Cadre · ${counts.Agent} Agent`}</div>
         </div>
-        {isAdmin && (
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link to="/admin/voters" className="btn btn-secondary">Importer des votants</Link>
-          </div>
-        )}
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
