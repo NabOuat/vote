@@ -11,6 +11,12 @@ const CATEGORY_FILTERS = [
   { value: 'Agent', label: 'Agent' },
 ]
 
+const ROLE_LABELS = {
+  SUPER_ADMIN: { label: 'Super Admin', badge: 'badge-purple' },
+  ADMIN_VOTE:  { label: 'Admin', badge: 'badge-blue' },
+  VOTER:       { label: 'Votant', badge: 'badge-green' },
+}
+
 const PAGE_SIZE = 25
 
 function Pagination({ page, pageCount, onChange, colors }) {
@@ -50,7 +56,7 @@ export default function VotersList() {
   const { colors } = theme
   const toast = useToast()
   const { user } = useVoteAuth()
-  const isAdmin = user?.role === 'ADMIN_VOTE'
+  const isAdmin = user?.role === 'ADMIN_VOTE' || user?.role === 'SUPER_ADMIN'
   const [voters, setVoters] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
@@ -173,7 +179,7 @@ export default function VotersList() {
                   </td>
                   {isAdmin && (
                     <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                      <span className="badge badge-green">Votant</span>
+                      <span className={`badge ${ROLE_LABELS[v.role]?.badge ?? 'badge-gray'}`}>{ROLE_LABELS[v.role]?.label ?? v.role}</span>
                     </td>
                   )}
                 </tr>

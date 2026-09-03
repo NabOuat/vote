@@ -312,14 +312,15 @@ adminRouter.post('/voters/import', asyncHandler(async (req, res) => {
   res.status(201).json({ created, errors })
 }))
 
-/** Liste tous les votants (role VOTER) avec leur catégorie et état d'activation.
- * Filtrage optionnel par catégorie via ?category=Cadre|Agent. */
+/** Liste tous les comptes actifs (VOTER, ADMIN_VOTE, SUPER_ADMIN — les
+ * comptes RH sont aussi votants) avec leur rôle, catégorie et état
+ * d'activation. Filtrage optionnel par catégorie via ?category=Cadre|Agent. */
 adminRouter.get('/voters', asyncHandler(async (req, res) => {
   const cat = req.query.category
-  let sql = `SELECT id, username, full_name, poste, category, active, created_at FROM users WHERE role = 'VOTER' ORDER BY full_name`
+  let sql = `SELECT id, username, full_name, poste, category, role, active, created_at FROM users WHERE active = 1 ORDER BY full_name`
   let args = []
   if (cat === 'Cadre' || cat === 'Agent') {
-    sql = `SELECT id, username, full_name, poste, category, active, created_at FROM users WHERE role = 'VOTER' AND category = ? ORDER BY full_name`
+    sql = `SELECT id, username, full_name, poste, category, role, active, created_at FROM users WHERE active = 1 AND category = ? ORDER BY full_name`
     args = [cat]
   }
   const { rows } = await db.execute({ sql, args })
