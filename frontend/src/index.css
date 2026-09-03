@@ -38,6 +38,11 @@
   z-index: 90;
   box-shadow: var(--shadow-sm);
 }
+.vote-header-nav {
+  scrollbar-width: none;
+}
+.vote-header-nav::-webkit-scrollbar { display: none; }
+
 @media (max-width: 768px) {
   .mobile-header { display: flex; }
   .desktop-only  { display: none !important; }

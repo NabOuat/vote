@@ -43,10 +43,10 @@ export default function VoteLayout({ children }) {
   }
 
   const linkStyle = ({ isActive }) => ({
-    padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+    padding: '7px 12px', borderRadius: 9, fontSize: 12.5, fontWeight: 600,
     color: isActive ? colors.greenDark : colors.gray500,
     background: isActive ? colors.greenLight : 'transparent',
-    textDecoration: 'none',
+    textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
     transition: 'background 0.15s, color 0.15s',
   })
 
@@ -60,9 +60,9 @@ export default function VoteLayout({ children }) {
       }}>
         <div className="vote-header" style={{
           maxWidth: 1040, margin: '0 auto',
-          padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 20,
+          padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 12,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, flexShrink: 0 }}>
             <div style={{
               width: 32, height: 32, borderRadius: 9,
               background: `linear-gradient(135deg, ${colors.green}, ${colors.orange})`,
@@ -76,7 +76,7 @@ export default function VoteLayout({ children }) {
             <div className="vote-header-title" style={{ fontWeight: 800, color: colors.gray900, fontSize: 14.5, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>Système de vote</div>
           </div>
 
-          <nav style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          <nav className="vote-header-nav" style={{ display: 'flex', gap: 3, minWidth: 0, overflowX: 'auto' }}>
             {isAdmin ? (
               <>
                 <NavLink to="/admin" style={linkStyle} end>Élections</NavLink>
@@ -93,23 +93,24 @@ export default function VoteLayout({ children }) {
             )}
           </nav>
 
-          <div style={{ flex: 1 }} />
+          <div style={{ flex: 1, minWidth: 8 }} />
 
-          <button
-            type="button"
-            onClick={forceSignOut}
-            title="Déconnexion"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
-              background: 'none', border: `1px solid ${colors.gray200}`, borderRadius: 10,
-              padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5,
-              fontWeight: 600, color: colors.gray500,
-            }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            <span className="vote-header-username">Déconnexion</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={forceSignOut}
+              title="Déconnexion"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                background: 'none', border: `1px solid ${colors.gray200}`, borderRadius: 9,
+                padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12,
+                fontWeight: 600, color: colors.gray500,
+              }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span className="vote-header-username">Déconnexion</span>
+            </button>
 
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <button
@@ -174,6 +175,7 @@ export default function VoteLayout({ children }) {
                 </div>
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>
