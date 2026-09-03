@@ -73,6 +73,13 @@ async function runMigrations() {
 
   // 008 — téléphone mobile, récupéré depuis Microsoft Graph comme le poste.
   await ensureColumn('users', 'mobile_phone', 'TEXT')
+
+  // 009 — vote marqué "test" à la création : un super-admin peut alors le
+  // démarrer instantanément (pas de délai de 5 min) et le clôturer à tout
+  // moment, sans attendre l'heure de fin programmée. Jamais possible sur un
+  // vote réel (is_test = 0), pour ne jamais pouvoir manipuler un scrutin en
+  // cours.
+  await ensureColumn('votes', 'is_test', 'INTEGER NOT NULL DEFAULT 0')
 }
 
 let migrated = null

@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { getVoteDetail, getVoteResultsAdmin, createCandidate, deleteCandidate, updateCandidateInfo, deleteVote, publishTourResults, candidatePhotoUrl, candidateSelfLink, searchUsers } from '../../api/vote.js'
+import { useVoteAuth } from '../../context/VoteAuthContext.jsx'
+import { getVoteDetail, getVoteResultsAdmin, createCandidate, deleteCandidate, updateCandidateInfo, deleteVote, publishTourResults, closeTourNow, candidatePhotoUrl, candidateSelfLink, searchUsers } from '../../api/vote.js'
 
 const STATUS = {
   UPCOMING: { label: 'À venir', badge: 'badge-gray' },
@@ -352,6 +353,8 @@ export default function VoteManage() {
   const navigate = useNavigate()
   const { colors, radius } = theme
   const toast = useToast()
+  const { user } = useVoteAuth()
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const [vote, setVote] = useState(null)
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -473,6 +476,17 @@ export default function VoteManage() {
     }
   }
 
+  async function handleCloseNow(tourId) {
+    if (!window.confirm('Clôturer ce tour de test maintenant, avant son heure de fin prévue ?')) return
+    try {
+      await closeTourNow(tourId)
+      toast.success('Tour clôturé.', 'Vote de test')
+      await load()
+    } catch (err) {
+      toast.error(err.message ?? 'Erreur.', 'Erreur')
+    }
+  }
+
   if (loading) return <div style={{ color: colors.gray400, fontSize: 13 }}>Chargement…</div>
   if (!vote) return <div style={{ color: colors.gray400, fontSize: 13 }}>Vote introuvable.</div>
 
@@ -504,15 +518,28 @@ export default function VoteManage() {
                 {new Date(tour.starts_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })} → {new Date(tour.ends_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}
               </span>
               <div style={{ flex: 1 }} />
-              {tour.status === 'UPCOMING' && (
+              {vote.is_test && (
+                <span className="badge badge-orange">Test</span>
+              )}
+              {(tour.status === 'UPCOMING' || (tour.status === 'ONGOING' && vote.is_test && isSuperAdmin)) && (
                 <button className="btn btn-secondary btn-sm" onClick={() => { setForm({ fullName: '', poste: '', program: '', photo: null, photoUrl: '' }); setCandidateModal(tour.id) }}>
                   + Candidat
                 </button>
               )}
-              {tour.status !== 'UPCOMING' && (
+              {tour.status === 'CLOSED' && (
                 <span style={{ fontSize: 11.5, color: colors.gray400, fontStyle: 'italic' }}>
-                  Candidats verrouillés — le tour est {tour.status === 'ONGOING' ? 'ouvert' : 'clôturé'}
+                  Candidats verrouillés — le tour est clôturé
                 </span>
+              )}
+              {tour.status === 'ONGOING' && !(vote.is_test && isSuperAdmin) && (
+                <span style={{ fontSize: 11.5, color: colors.gray400, fontStyle: 'italic' }}>
+                  Candidats verrouillés — le tour est ouvert
+                </span>
+              )}
+              {tour.status === 'ONGOING' && vote.is_test && isSuperAdmin && (
+                <button className="btn btn-danger btn-sm" onClick={() => handleCloseNow(tour.id)}>
+                  Clôturer maintenant
+                </button>
               )}
               {tour.status === 'CLOSED' && !tourResult?.publishedAt && (
                 <button className="btn btn-primary btn-sm" onClick={() => handlePublish(tour.id)}>Publier les résultats</button>
@@ -548,7 +575,7 @@ export default function VoteManage() {
                     key={c.id}
                     candidate={c}
                     votes={ranking.find(r => r.id === c.id)?.votes}
-                    canEdit={tour.status === 'UPCOMING'}
+                    canEdit={tour.status === 'UPCOMING' || (tour.status === 'ONGOING' && vote.is_test && isSuperAdmin)}
                     onDelete={() => handleDeleteCandidate(c.id)}
                     onCopyLink={() => handleCopyLink(c)}
                     onEditProgram={() => openProgramModal(c)}

@@ -37,6 +37,8 @@ export const createVote          = (sessionId, data) => voteApiFetch(`/admin/ses
 export const getVoteDetail       = (voteId) => voteApiFetch(`/admin/votes/${voteId}`)
 export const getVoteResultsAdmin  = (voteId) => voteApiFetch(`/admin/votes/${voteId}/results`)
 export const publishTourResults   = (tourId) => voteApiFetch(`/admin/tours/${tourId}/publish`, { method: 'POST' })
+/** Clôture immédiate — réservé aux votes marqués "test", et aux super-admins. */
+export const closeTourNow         = (tourId) => voteApiFetch(`/admin/tours/${tourId}/close-now`, { method: 'POST' })
 export const deleteSession        = (sessionId) => voteApiFetch(`/admin/sessions/${sessionId}`, { method: 'DELETE' })
 export const deleteVote           = (voteId) => voteApiFetch(`/admin/votes/${voteId}`, { method: 'DELETE' })
 

@@ -2,9 +2,16 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { theme } from '../../styles/theme.js'
 import { useToast } from '../../context/ToastContext.jsx'
+import { useVoteAuth } from '../../context/VoteAuthContext.jsx'
 import { getSessionDetail, createVote } from '../../api/vote.js'
 
-const EMPTY_FORM = { label: '', category: 'both', tour1Start: '', tour1End: '' }
+const EMPTY_FORM = { label: '', category: 'both', tour1Start: '', tour1End: '', isTest: false }
+
+/** Format attendu par <input type="datetime-local">. */
+function toLocalInputValue(date) {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
 
 const CATEGORIES = [
   { value: 'both', label: 'Les deux', desc: 'Tous les votants (Cadre et Agent)' },
@@ -37,6 +44,8 @@ export default function SessionDetail() {
   const { sessionId } = useParams()
   const { colors } = theme
   const toast = useToast()
+  const { user } = useVoteAuth()
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -58,6 +67,7 @@ export default function SessionDetail() {
       await createVote(sessionId, {
         label: form.label.trim(),
         category: form.category,
+        isTest: isSuperAdmin && form.isTest,
         tour1: { startsAt: new Date(form.tour1Start).toISOString(), endsAt: new Date(form.tour1End).toISOString() },
       })
       toast.success('Vote créé.', 'Vote')
@@ -132,6 +142,39 @@ export default function SessionDetail() {
                 <CategoryPicker value={form.category} onChange={c => setForm(f => ({ ...f, category: c }))} colors={colors} radius={theme.radius} />
               </div>
 
+              {isSuperAdmin && (
+                <label style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px',
+                  borderRadius: theme.radius.md, cursor: 'pointer',
+                  background: form.isTest ? colors.orangeLight : colors.gray50,
+                  border: `1.5px solid ${form.isTest ? colors.orange : colors.gray200}`,
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={form.isTest}
+                    onChange={e => {
+                      const checked = e.target.checked
+                      setForm(f => ({
+                        ...f,
+                        isTest: checked,
+                        tour1Start: checked && !f.tour1Start ? toLocalInputValue(new Date()) : f.tour1Start,
+                        tour1End: checked && !f.tour1End ? toLocalInputValue(new Date(Date.now() + 3600000)) : f.tour1End,
+                      }))
+                    }}
+                    style={{ marginTop: 2, accentColor: colors.orange }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: form.isTest ? colors.orangeDark : colors.gray700 }}>
+                      Vote de test
+                    </div>
+                    <div style={{ fontSize: 11.5, color: colors.gray500, marginTop: 2 }}>
+                      Démarrage instantané autorisé, candidats modifiables même une fois ouvert,
+                      et clôture manuelle possible à tout moment — jamais disponible sur un vrai scrutin.
+                    </div>
+                  </div>
+                </label>
+              )}
+
               <div style={{ background: colors.gray50, borderRadius: theme.radius.lg, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{
@@ -153,7 +196,9 @@ export default function SessionDetail() {
                   </div>
                 </div>
                 <div style={{ fontSize: 11, color: colors.gray400 }}>
-                  Doit démarrer au moins 5 minutes dans le futur, le temps d'ajouter les candidats.
+                  {form.isTest && isSuperAdmin
+                    ? 'Vote de test : démarrage immédiat autorisé.'
+                    : 'Doit démarrer au moins 5 minutes dans le futur, le temps d\'ajouter les candidats.'}
                 </div>
               </div>
 

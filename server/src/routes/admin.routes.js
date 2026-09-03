@@ -5,6 +5,7 @@ import { db } from '../db.js'
 import { requireAuth, requireRole, requireSuperAdmin } from '../middleware/auth.js'
 import { uploadCandidatePhoto, storeCandidatePhoto } from '../middleware/upload.js'
 import { tallyTour } from '../services/tally.service.js'
+import { flushStaging } from '../services/ballot.service.js'
 import { asyncHandler } from '../lib/asyncHandler.js'
 
 export const adminRouter = Router()
@@ -104,17 +105,23 @@ adminRouter.post('/sessions/:sessionId/votes', asyncHandler(async (req, res) => 
   const { rows: [session] } = await db.execute({ sql: 'SELECT * FROM sessions WHERE id = ?', args: [req.params.sessionId] })
   if (!session) return res.status(404).json({ message: 'Session introuvable.' })
 
-  const { label, tour1, category } = req.body ?? {}
+  const { label, tour1, category, isTest } = req.body ?? {}
   if (!label?.trim()) return res.status(400).json({ message: 'Le libellé du vote est requis.' })
   // Le nombre de tours est désormais toujours 1 — plus de ballottage automatique.
   const roundsCount = 1
   if (!tour1?.startsAt || !tour1?.endsAt) return res.status(400).json({ message: 'Période du tour 1 requise.' })
   // Catégorie d'éligibilité : 'Cadre', 'Agent' ou 'both' (tout le monde).
   const voteCategory = ['Cadre', 'Agent', 'both'].includes(category) ? category : 'both'
+  // "Vote de test" : réservé aux super-admins, jamais sur un vrai scrutin —
+  // permet un démarrage instantané et une clôture manuelle à tout moment
+  // (voir PUT /tours/:tourId/close-now). Un admin normal qui coche la case
+  // est ignoré silencieusement (isTestVote reste false).
+  const isTestVote = Boolean(isTest) && req.user.role === 'SUPER_ADMIN'
   // Le tour 1 ne doit pas démarrer déjà passé — sinon il s'ouvre immédiatement,
   // avant même que des candidats aient pu être ajoutés (verrouillé une fois
   // ONGOING), ce qui bloque le vote sans recours possible depuis l'admin.
-  if (new Date(tour1.startsAt).getTime() < Date.now() + 5 * 60000) {
+  // Un vote de test s'affranchit de cette règle (démarrage instantané voulu).
+  if (!isTestVote && new Date(tour1.startsAt).getTime() < Date.now() + 5 * 60000) {
     return res.status(400).json({ message: 'Le tour 1 doit démarrer au moins 5 minutes dans le futur (le temps d\'ajouter les candidats avant l\'ouverture).' })
   }
   if (new Date(tour1.endsAt) <= new Date(tour1.startsAt)) {
@@ -125,8 +132,8 @@ adminRouter.post('/sessions/:sessionId/votes', asyncHandler(async (req, res) => 
   let voteId
   try {
     const vote = await tx.execute({
-      sql: 'INSERT INTO votes (session_id, label, rounds_count, category) VALUES (?, ?, ?, ?)',
-      args: [session.id, label.trim(), roundsCount, voteCategory],
+      sql: 'INSERT INTO votes (session_id, label, rounds_count, category, is_test) VALUES (?, ?, ?, ?, ?)',
+      args: [session.id, label.trim(), roundsCount, voteCategory, isTestVote ? 1 : 0],
     })
     voteId = vote.lastInsertRowid
 
@@ -171,6 +178,20 @@ adminRouter.get('/votes/:voteId', asyncHandler(async (req, res) => {
   res.json(detail)
 }))
 
+/** Un super-admin peut modifier les candidats d'un tour de vote de TEST même
+ * une fois ouvert (ONGOING) — jamais sur un vrai scrutin (is_test = 0),
+ * quel que soit le rôle. Sert à ajouter des candidats à un vote de test créé
+ * avec un démarrage instantané, où le tour passe ONGOING avant même d'avoir
+ * pu en ajouter un seul. */
+async function canBypassTourLock(req, tourId) {
+  if (req.user.role !== 'SUPER_ADMIN') return false
+  const { rows: [row] } = await db.execute({
+    sql: 'SELECT v.is_test FROM tours t JOIN votes v ON v.id = t.vote_id WHERE t.id = ?',
+    args: [tourId],
+  })
+  return Boolean(row?.is_test)
+}
+
 /* ── Candidats ────────────────────────────────────────────────────── */
 adminRouter.post('/tours/:tourId/candidates', (req, res, next) => {
   uploadCandidatePhoto(req, res, (err) => {
@@ -182,7 +203,7 @@ adminRouter.post('/tours/:tourId/candidates', (req, res, next) => {
 async function handleCreateCandidate(req, res) {
   const { rows: [tour] } = await db.execute({ sql: 'SELECT * FROM tours WHERE id = ?', args: [req.params.tourId] })
   if (!tour) return res.status(404).json({ message: 'Tour introuvable.' })
-  if (tour.status !== 'UPCOMING') {
+  if (tour.status !== 'UPCOMING' && !(await canBypassTourLock(req, tour.id))) {
     return res.status(409).json({ message: 'Impossible de modifier les candidats une fois le tour ouvert.' })
   }
   const { fullName, poste, program, photoUrl } = req.body ?? {}
@@ -212,7 +233,7 @@ adminRouter.put('/candidates/:candidateId', asyncHandler(async (req, res) => {
   const { rows: [candidate] } = await db.execute({ sql: 'SELECT * FROM candidates WHERE id = ?', args: [req.params.candidateId] })
   if (!candidate) return res.status(404).json({ message: 'Candidat introuvable.' })
   const { rows: [tour] } = await db.execute({ sql: 'SELECT * FROM tours WHERE id = ?', args: [candidate.tour_id] })
-  if (tour.status !== 'UPCOMING') {
+  if (tour.status !== 'UPCOMING' && !(await canBypassTourLock(req, tour.id))) {
     return res.status(409).json({ message: 'Impossible de modifier le programme une fois le tour ouvert.' })
   }
   const { program, poste } = req.body ?? {}
@@ -228,7 +249,7 @@ adminRouter.delete('/candidates/:candidateId', asyncHandler(async (req, res) => 
   const { rows: [candidate] } = await db.execute({ sql: 'SELECT * FROM candidates WHERE id = ?', args: [req.params.candidateId] })
   if (!candidate) return res.status(404).json({ message: 'Candidat introuvable.' })
   const { rows: [tour] } = await db.execute({ sql: 'SELECT * FROM tours WHERE id = ?', args: [candidate.tour_id] })
-  if (tour.status !== 'UPCOMING') {
+  if (tour.status !== 'UPCOMING' && !(await canBypassTourLock(req, tour.id))) {
     return res.status(409).json({ message: 'Impossible de supprimer un candidat une fois le tour ouvert.' })
   }
   await db.execute({ sql: 'DELETE FROM candidates WHERE id = ?', args: [candidate.id] })
@@ -391,6 +412,28 @@ adminRouter.get('/votes/:voteId/results', asyncHandler(async (req, res) => {
     ranking: t.status === 'UPCOMING' ? null : await tallyTour(t.id),
   })))
   res.json({ voteId: vote.id, results })
+}))
+
+/** Clôture immédiate, sans attendre l'heure de fin programmée — réservé aux
+ * super-admins, et uniquement sur un vote marqué "test" à la création
+ * (is_test). Jamais possible sur un vrai scrutin, peu importe le rôle : la
+ * garde is_test est vérifiée ici, pas seulement côté UI. */
+adminRouter.post('/tours/:tourId/close-now', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const { rows: [tour] } = await db.execute({
+    sql: `SELECT t.*, v.is_test FROM tours t JOIN votes v ON v.id = t.vote_id WHERE t.id = ?`,
+    args: [req.params.tourId],
+  })
+  if (!tour) return res.status(404).json({ message: 'Tour introuvable.' })
+  if (!tour.is_test) {
+    return res.status(403).json({ message: 'Clôture manuelle réservée aux votes marqués comme test.' })
+  }
+  if (tour.status !== 'ONGOING') {
+    return res.status(409).json({ message: 'Ce tour n\'est pas en cours.' })
+  }
+  await flushStaging(tour.id) // les bulletins doivent être définitifs avant dépouillement
+  const now = new Date().toISOString()
+  await db.execute({ sql: "UPDATE tours SET status = 'CLOSED', closed_at = ? WHERE id = ?", args: [now, tour.id] })
+  res.json(await getVoteDetail((await db.execute({ sql: 'SELECT vote_id FROM tours WHERE id = ?', args: [tour.id] })).rows[0].vote_id))
 }))
 
 adminRouter.post('/tours/:tourId/publish', asyncHandler(async (req, res) => {
