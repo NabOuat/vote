@@ -418,13 +418,16 @@ adminRouter.put('/users/:userId/password', requireSuperAdmin, asyncHandler(async
  * SUPER_ADMIN), pas réservées aux super-admins : chaque admin doit pouvoir
  * suivre le taux de connexion des votants dont il a la charge. */
 adminRouter.get('/stats', asyncHandler(async (req, res) => {
-  const { rows: [{ total }] } = await db.execute("SELECT COUNT(*) AS total FROM users WHERE role = 'VOTER' AND active = 1")
-  const { rows: [{ connected }] } = await db.execute("SELECT COUNT(*) AS connected FROM users WHERE role = 'VOTER' AND active = 1 AND last_login_at IS NOT NULL")
+  // Tous les comptes actifs comptent — votants ET admins (ADMIN_VOTE,
+  // SUPER_ADMIN) : un admin est aussi un utilisateur du système, son taux de
+  // connexion doit apparaître comme celui de n'importe quel votant.
+  const { rows: [{ total }] } = await db.execute("SELECT COUNT(*) AS total FROM users WHERE active = 1")
+  const { rows: [{ connected }] } = await db.execute("SELECT COUNT(*) AS connected FROM users WHERE active = 1 AND last_login_at IS NOT NULL")
   const { rows: byCategory } = await db.execute(`
     SELECT COALESCE(category, 'Non renseigné') AS category,
       COUNT(*) AS total,
       SUM(CASE WHEN last_login_at IS NOT NULL THEN 1 ELSE 0 END) AS connected
-    FROM users WHERE role = 'VOTER' AND active = 1
+    FROM users WHERE active = 1
     GROUP BY category
   `)
   const PAGE_SIZE = 10

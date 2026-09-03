@@ -73,7 +73,7 @@ export default function AdminStats() {
       <div className="page-header">
         <div>
           <div className="page-title">Statistiques de connexion</div>
-          <div className="page-sub">Taux de connexion des votants et historique des connexions</div>
+          <div className="page-sub">Taux de connexion de tous les comptes (votants et admins) et historique des connexions</div>
         </div>
       </div>
 
@@ -87,7 +87,7 @@ export default function AdminStats() {
           <div style={{ fontSize: 28, fontWeight: 800, color: colors.gray900, marginTop: 6 }}>{stats.connected}</div>
         </div>
         <div className="card">
-          <div style={{ fontSize: 11.5, color: colors.gray400, textTransform: 'uppercase', letterSpacing: '.03em', fontWeight: 700 }}>Votants au total</div>
+          <div style={{ fontSize: 11.5, color: colors.gray400, textTransform: 'uppercase', letterSpacing: '.03em', fontWeight: 700 }}>Comptes au total</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: colors.gray900, marginTop: 6 }}>{stats.total}</div>
         </div>
       </div>
