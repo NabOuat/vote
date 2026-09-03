@@ -33,6 +33,15 @@ export default function VoteLayout({ children }) {
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const [profileOpen, setProfileOpen] = useState(false)
 
+  /** Bouton de déconnexion indépendant du menu déroulant — repose sur un
+   * rechargement complet plutôt que sur le seul état React, pour rester
+   * fiable même si un état local reste bloqué (menu qui ne s'ouvre pas,
+   * etc.). Toujours visible dans la barre de navigation. */
+  function forceSignOut() {
+    signOut()
+    window.location.href = '/'
+  }
+
   const linkStyle = ({ isActive }) => ({
     padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
     color: isActive ? colors.greenDark : colors.gray500,
@@ -85,6 +94,22 @@ export default function VoteLayout({ children }) {
           </nav>
 
           <div style={{ flex: 1 }} />
+
+          <button
+            type="button"
+            onClick={forceSignOut}
+            title="Déconnexion"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+              background: 'none', border: `1px solid ${colors.gray200}`, borderRadius: 10,
+              padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5,
+              fontWeight: 600, color: colors.gray500,
+            }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            <span className="vote-header-username">Déconnexion</span>
+          </button>
 
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <button

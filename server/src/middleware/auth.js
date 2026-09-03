@@ -6,7 +6,7 @@ export function signToken(user) {
   return jwt.sign(
     { sub: user.id, role: user.role, fullName: user.full_name },
     JWT_SECRET,
-    { expiresIn: '12h' }
+    { expiresIn: '15m' }
   )
 }
 
