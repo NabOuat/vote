@@ -70,9 +70,10 @@ export default function VoteLayout({ children }) {
           <nav style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
             {isAdmin ? (
               <>
-                <NavLink to="/admin" style={linkStyle} end>Sessions</NavLink>
+                <NavLink to="/admin" style={linkStyle} end>Élections</NavLink>
                 <NavLink to="/admin/voters/list" style={linkStyle} end>Liste</NavLink>
                 <NavLink to="/mon-vote" style={linkStyle} end>Mon vote</NavLink>
+                <NavLink to="/admin/stats" style={linkStyle} end>Statistiques</NavLink>
                 {isSuperAdmin && <NavLink to="/admin/administrateurs" style={linkStyle} end>Admins</NavLink>}
               </>
             ) : (

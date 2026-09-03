@@ -30,7 +30,7 @@ adminRouter.get('/sessions', asyncHandler(async (req, res) => {
 
 adminRouter.get('/sessions/:sessionId', asyncHandler(async (req, res) => {
   const { rows: [session] } = await db.execute({ sql: 'SELECT * FROM sessions WHERE id = ?', args: [req.params.sessionId] })
-  if (!session) return res.status(404).json({ message: 'Session introuvable.' })
+  if (!session) return res.status(404).json({ message: 'Élection introuvable.' })
   const { rows: votes } = await db.execute({ sql: 'SELECT * FROM votes WHERE session_id = ? ORDER BY created_at', args: [session.id] })
   res.json({ ...session, votes })
 }))
@@ -64,7 +64,7 @@ async function deleteVoteCascade(tx, voteId) {
 
 adminRouter.delete('/sessions/:sessionId', asyncHandler(async (req, res) => {
   const { rows: [session] } = await db.execute({ sql: 'SELECT * FROM sessions WHERE id = ?', args: [req.params.sessionId] })
-  if (!session) return res.status(404).json({ message: 'Session introuvable.' })
+  if (!session) return res.status(404).json({ message: 'Élection introuvable.' })
   const { rows: votes } = await db.execute({ sql: 'SELECT id FROM votes WHERE session_id = ?', args: [session.id] })
   for (const v of votes) {
     if (await countReceiptsForVote(v.id) > 0) {
@@ -103,7 +103,7 @@ adminRouter.delete('/votes/:voteId', asyncHandler(async (req, res) => {
 /* ── Votes (+ tours) ──────────────────────────────────────────────── */
 adminRouter.post('/sessions/:sessionId/votes', asyncHandler(async (req, res) => {
   const { rows: [session] } = await db.execute({ sql: 'SELECT * FROM sessions WHERE id = ?', args: [req.params.sessionId] })
-  if (!session) return res.status(404).json({ message: 'Session introuvable.' })
+  if (!session) return res.status(404).json({ message: 'Élection introuvable.' })
 
   const { label, tour1, category, isTest } = req.body ?? {}
   if (!label?.trim()) return res.status(400).json({ message: 'Le libellé du vote est requis.' })
@@ -377,6 +377,68 @@ adminRouter.put('/users/:userId/role', requireSuperAdmin, asyncHandler(async (re
   if (!target) return res.status(404).json({ message: 'Compte introuvable.' })
   await db.execute({ sql: 'UPDATE users SET role = ? WHERE id = ?', args: [role, userId] })
   res.json({ message: 'Rôle mis à jour.' })
+}))
+
+/** Suppression d'un compte (votant ou admin), réservée aux super-admins.
+ * Un super-admin ne peut pas se supprimer lui-même, ni supprimer le dernier
+ * compte SUPER_ADMIN restant (sinon plus personne ne pourrait gérer les accès). */
+adminRouter.delete('/users/:userId', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const userId = Number(req.params.userId)
+  if (userId === req.user.sub) {
+    return res.status(409).json({ message: 'Impossible de supprimer son propre compte.' })
+  }
+  const { rows: [target] } = await db.execute({ sql: 'SELECT id, role FROM users WHERE id = ?', args: [userId] })
+  if (!target) return res.status(404).json({ message: 'Compte introuvable.' })
+  if (target.role === 'SUPER_ADMIN') {
+    const { rows: [{ count }] } = await db.execute("SELECT COUNT(*) AS count FROM users WHERE role = 'SUPER_ADMIN'")
+    if (count <= 1) {
+      return res.status(409).json({ message: 'Impossible de supprimer le dernier super-administrateur.' })
+    }
+  }
+  await db.execute({ sql: 'DELETE FROM users WHERE id = ?', args: [userId] })
+  res.json({ message: 'Compte supprimé.' })
+}))
+
+/** Réinitialisation du mot de passe d'un compte par un super-admin — utile
+ * quand une personne a oublié le sien et n'a pas accès à Microsoft. */
+adminRouter.put('/users/:userId/password', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const { password } = req.body ?? {}
+  if (!password || password.length < 8) {
+    return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 8 caractères.' })
+  }
+  const userId = Number(req.params.userId)
+  const { rows: [target] } = await db.execute({ sql: 'SELECT id FROM users WHERE id = ?', args: [userId] })
+  if (!target) return res.status(404).json({ message: 'Compte introuvable.' })
+  const hash = bcrypt.hashSync(password, 10)
+  await db.execute({ sql: 'UPDATE users SET password_hash = ? WHERE id = ?', args: [hash, userId] })
+  res.json({ message: 'Mot de passe réinitialisé.' })
+}))
+
+/** Statistiques de connexion — accessibles à tout admin (ADMIN_VOTE ou
+ * SUPER_ADMIN), pas réservées aux super-admins : chaque admin doit pouvoir
+ * suivre le taux de connexion des votants dont il a la charge. */
+adminRouter.get('/stats', asyncHandler(async (req, res) => {
+  const { rows: [{ total }] } = await db.execute("SELECT COUNT(*) AS total FROM users WHERE role = 'VOTER' AND active = 1")
+  const { rows: [{ connected }] } = await db.execute("SELECT COUNT(*) AS connected FROM users WHERE role = 'VOTER' AND active = 1 AND last_login_at IS NOT NULL")
+  const { rows: byCategory } = await db.execute(`
+    SELECT COALESCE(category, 'Non renseigné') AS category,
+      COUNT(*) AS total,
+      SUM(CASE WHEN last_login_at IS NOT NULL THEN 1 ELSE 0 END) AS connected
+    FROM users WHERE role = 'VOTER' AND active = 1
+    GROUP BY category
+  `)
+  const { rows: users } = await db.execute(`
+    SELECT id, username, full_name, role, category, poste, last_login_at
+    FROM users WHERE active = 1
+    ORDER BY (last_login_at IS NULL), last_login_at DESC, full_name
+  `)
+  res.json({
+    total,
+    connected,
+    rate: total > 0 ? connected / total : 0,
+    byCategory,
+    users,
+  })
 }))
 
 /** Recherche parmi les comptes existants (votants + admins) — utilisé par

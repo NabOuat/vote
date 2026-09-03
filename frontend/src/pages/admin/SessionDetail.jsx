@@ -82,13 +82,13 @@ export default function SessionDetail() {
   }
 
   if (loading) return <div style={{ color: colors.gray400, fontSize: 13 }}>Chargement…</div>
-  if (!session) return <div style={{ color: colors.gray400, fontSize: 13 }}>Session introuvable.</div>
+  if (!session) return <div style={{ color: colors.gray400, fontSize: 13 }}>Élection introuvable.</div>
 
   return (
     <div style={{ maxWidth: 900 }}>
       <div className="page-header">
         <div>
-          <Link to="/admin" style={{ fontSize: 12, color: colors.gray400 }}>← Sessions</Link>
+          <Link to="/admin" style={{ fontSize: 12, color: colors.gray400 }}>← Élections</Link>
           <div className="page-title" style={{ marginTop: 4 }}>{session.label}</div>
           {session.description && <div className="page-sub">{session.description}</div>}
         </div>
@@ -96,7 +96,7 @@ export default function SessionDetail() {
       </div>
 
       {session.votes.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: colors.gray400, padding: 40 }}>Aucun vote dans cette session.</div>
+        <div className="card" style={{ textAlign: 'center', color: colors.gray400, padding: 40 }}>Aucun vote dans cette élection.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {session.votes.map(v => (

@@ -496,7 +496,7 @@ export default function VoteManage() {
     <div style={{ maxWidth: 900 }}>
       <div className="page-header">
         <div>
-          <Link to={`/admin/sessions/${vote.session_id}`} style={{ fontSize: 12, color: colors.gray400 }}>← Session</Link>
+          <Link to={`/admin/sessions/${vote.session_id}`} style={{ fontSize: 12, color: colors.gray400 }}>← Élection</Link>
           <div className="page-title" style={{ marginTop: 4 }}>{vote.label}</div>
         </div>
         <button className="btn btn-secondary btn-sm" onClick={handleDeleteVote} style={{ color: colors.errorText }}>

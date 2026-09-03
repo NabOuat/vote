@@ -80,6 +80,10 @@ async function runMigrations() {
   // vote réel (is_test = 0), pour ne jamais pouvoir manipuler un scrutin en
   // cours.
   await ensureColumn('votes', 'is_test', 'INTEGER NOT NULL DEFAULT 0')
+
+  // 010 — dernière connexion, pour les statistiques de taux de connexion
+  // (accessibles à tous les admins, pas seulement aux super-admins).
+  await ensureColumn('users', 'last_login_at', 'TEXT')
 }
 
 let migrated = null

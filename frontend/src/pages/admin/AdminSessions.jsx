@@ -26,7 +26,7 @@ export default function AdminSessions() {
     setSaving(true)
     try {
       await createSession(form)
-      toast.success('Session créée.', 'Vote')
+      toast.success('Élection créée.', 'Vote')
       setForm({ label: '', description: '' })
       setModalOpen(false)
       await load()
@@ -40,10 +40,10 @@ export default function AdminSessions() {
   async function handleDelete(e, session) {
     e.preventDefault()
     e.stopPropagation()
-    if (!window.confirm(`Supprimer la session "${session.label}" et tous ses votes ? Cette action est définitive.`)) return
+    if (!window.confirm(`Supprimer l'élection "${session.label}" et tous ses votes ? Cette action est définitive.`)) return
     try {
       await deleteSession(session.id)
-      toast.success('Session supprimée.', 'Vote')
+      toast.success('Élection supprimée.', 'Vote')
       await load()
     } catch (err) {
       toast.error(err.message ?? 'Erreur.', 'Erreur')
@@ -54,19 +54,19 @@ export default function AdminSessions() {
     <div style={{ maxWidth: 900 }}>
       <div className="page-header">
         <div>
-          <div className="page-title">Sessions de vote</div>
+          <div className="page-title">Élections</div>
           <div className="page-sub">Organisez des élections comprenant un ou plusieurs votes</div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <Link to="/admin/voters" className="btn btn-secondary">Importer des votants</Link>
-          <button className="btn btn-primary" onClick={() => setModalOpen(true)}>+ Nouvelle session</button>
+          <button className="btn btn-primary" onClick={() => setModalOpen(true)}>+ Nouvelle élection</button>
         </div>
       </div>
 
       {loading ? (
         <div style={{ color: colors.gray400, fontSize: 13 }}>Chargement…</div>
       ) : sessions.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', color: colors.gray400, padding: 40 }}>Aucune session pour l'instant.</div>
+        <div className="card" style={{ textAlign: 'center', color: colors.gray400, padding: 40 }}>Aucune élection pour l'instant.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {sessions.map(s => (
@@ -93,7 +93,7 @@ export default function AdminSessions() {
               <button
                 type="button"
                 onClick={e => handleDelete(e, s)}
-                title="Supprimer la session"
+                title="Supprimer l'élection"
                 style={{
                   width: 30, height: 30, borderRadius: 8, flexShrink: 0, border: 'none',
                   background: 'transparent', color: colors.gray300, display: 'flex',
@@ -117,7 +117,7 @@ export default function AdminSessions() {
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModalOpen(false)}>
           <div className="modal">
             <div className="modal-header">
-              <div className="modal-title">Nouvelle session de vote</div>
+              <div className="modal-title">Nouvelle élection</div>
               <button className="modal-close" onClick={() => setModalOpen(false)}>×</button>
             </div>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

@@ -119,7 +119,7 @@ export default function VotersImport() {
     <div style={{ maxWidth: 700 }}>
       <div className="page-header">
         <div>
-          <Link to="/admin" style={{ fontSize: 12, color: colors.gray400 }}>← Sessions</Link>
+          <Link to="/admin" style={{ fontSize: 12, color: colors.gray400 }}>← Élections</Link>
           <div className="page-title" style={{ marginTop: 4 }}>Importer des votants</div>
           <div className="page-sub">Depuis un fichier Excel</div>
         </div>

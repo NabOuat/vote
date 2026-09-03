@@ -22,6 +22,8 @@ authRouter.post('/login', asyncHandler(async (req, res) => {
     return res.status(401).json({ message: 'Identifiants incorrects.' })
   }
 
+  await db.execute({ sql: 'UPDATE users SET last_login_at = ? WHERE id = ?', args: [new Date().toISOString(), user.id] })
+
   const token = signToken(user)
   res.json({ token, id: user.id, role: user.role, fullName: user.full_name, poste: user.poste ?? '', photoPath: user.photo_path ?? '', mobilePhone: user.mobile_phone ?? '' })
 }))
@@ -136,6 +138,8 @@ authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
       user.photo_path = url
     }
   }
+
+  await db.execute({ sql: 'UPDATE users SET last_login_at = ? WHERE id = ?', args: [new Date().toISOString(), user.id] })
 
   const token = signToken(user)
   const params = new URLSearchParams({

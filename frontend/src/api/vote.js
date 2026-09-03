@@ -73,6 +73,12 @@ export const clearVoters = () => voteApiFetch('/admin/voters', { method: 'DELETE
  * côté backend, jamais étendu à ADMIN_VOTE contrairement au reste. */
 export const listAdmins     = () => voteApiFetch('/admin/admins')
 export const updateUserRole = (userId, role) => voteApiFetch(`/admin/users/${userId}/role`, { method: 'PUT', body: JSON.stringify({ role }) })
+/** Suppression de compte et réinitialisation de mot de passe — réservées aux super-admins. */
+export const deleteUserAccount    = (userId) => voteApiFetch(`/admin/users/${userId}`, { method: 'DELETE' })
+export const resetUserPassword    = (userId, password) => voteApiFetch(`/admin/users/${userId}/password`, { method: 'PUT', body: JSON.stringify({ password }) })
+
+/* ── Statistiques de connexion — accessibles à tout admin ─────────────── */
+export const getConnectionStats = () => voteApiFetch('/admin/stats')
 
 /* ── Votant ───────────────────────────────────────────────────────── */
 export const listMyVotes    = () => voteApiFetch('/me/votes')
