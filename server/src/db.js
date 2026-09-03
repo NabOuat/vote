@@ -84,6 +84,13 @@ async function runMigrations() {
   // 010 — dernière connexion, pour les statistiques de taux de connexion
   // (accessibles à tous les admins, pas seulement aux super-admins).
   await ensureColumn('users', 'last_login_at', 'TEXT')
+
+  // 011 — IP et localisation (ville, pays) de la dernière connexion, résolue
+  // au mieux via un service de géolocalisation IP externe — voir
+  // geoLookup.service.js. NULL si la résolution échoue ou est sautée (IP
+  // privée en dev local).
+  await ensureColumn('users', 'last_login_ip', 'TEXT')
+  await ensureColumn('users', 'last_login_location', 'TEXT')
 }
 
 let migrated = null

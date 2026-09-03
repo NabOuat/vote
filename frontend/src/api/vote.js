@@ -78,7 +78,7 @@ export const deleteUserAccount    = (userId) => voteApiFetch(`/admin/users/${use
 export const resetUserPassword    = (userId, password) => voteApiFetch(`/admin/users/${userId}/password`, { method: 'PUT', body: JSON.stringify({ password }) })
 
 /* ── Statistiques de connexion — accessibles à tout admin ─────────────── */
-export const getConnectionStats = () => voteApiFetch('/admin/stats')
+export const getConnectionStats = (page = 1) => voteApiFetch(`/admin/stats?page=${page}`)
 
 /* ── Votant ───────────────────────────────────────────────────────── */
 export const listMyVotes    = () => voteApiFetch('/me/votes')

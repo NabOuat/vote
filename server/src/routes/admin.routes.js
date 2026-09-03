@@ -427,17 +427,29 @@ adminRouter.get('/stats', asyncHandler(async (req, res) => {
     FROM users WHERE role = 'VOTER' AND active = 1
     GROUP BY category
   `)
-  const { rows: users } = await db.execute(`
-    SELECT id, username, full_name, role, category, poste, last_login_at
-    FROM users WHERE active = 1
-    ORDER BY (last_login_at IS NULL), last_login_at DESC, full_name
-  `)
+  const PAGE_SIZE = 10
+  const page = Math.max(1, Number(req.query.page) || 1)
+  const { rows: [{ userCount }] } = await db.execute('SELECT COUNT(*) AS userCount FROM users WHERE active = 1')
+  const pageCount = Math.max(1, Math.ceil(userCount / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const { rows: users } = await db.execute({
+    sql: `
+      SELECT id, username, full_name, role, category, poste, last_login_at, last_login_location
+      FROM users WHERE active = 1
+      ORDER BY (last_login_at IS NULL), last_login_at DESC, full_name
+      LIMIT ? OFFSET ?
+    `,
+    args: [PAGE_SIZE, (currentPage - 1) * PAGE_SIZE],
+  })
   res.json({
     total,
     connected,
     rate: total > 0 ? connected / total : 0,
     byCategory,
     users,
+    page: currentPage,
+    pageCount,
+    userCount,
   })
 }))
 

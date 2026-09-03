@@ -5,6 +5,7 @@ import { signToken, requireAuth } from '../middleware/auth.js'
 import { asyncHandler } from '../lib/asyncHandler.js'
 import { isMicrosoftLoginConfigured, buildAuthorizeUrl, generateState, wasSilentAttempt, exchangeCode, fetchProfileFields, fetchProfilePhoto } from '../services/microsoftAuth.service.js'
 import { storeCandidatePhoto } from '../middleware/upload.js'
+import { extractClientIp, lookupLocation } from '../services/geoLookup.service.js'
 
 export const authRouter = Router()
 
@@ -22,7 +23,12 @@ authRouter.post('/login', asyncHandler(async (req, res) => {
     return res.status(401).json({ message: 'Identifiants incorrects.' })
   }
 
-  await db.execute({ sql: 'UPDATE users SET last_login_at = ? WHERE id = ?', args: [new Date().toISOString(), user.id] })
+  const ip = extractClientIp(req)
+  const location = await lookupLocation(ip)
+  await db.execute({
+    sql: 'UPDATE users SET last_login_at = ?, last_login_ip = ?, last_login_location = ? WHERE id = ?',
+    args: [new Date().toISOString(), ip || null, location, user.id],
+  })
 
   const token = signToken(user)
   res.json({ token, id: user.id, role: user.role, fullName: user.full_name, poste: user.poste ?? '', photoPath: user.photo_path ?? '', mobilePhone: user.mobile_phone ?? '' })
@@ -139,7 +145,12 @@ authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
     }
   }
 
-  await db.execute({ sql: 'UPDATE users SET last_login_at = ? WHERE id = ?', args: [new Date().toISOString(), user.id] })
+  const ip = extractClientIp(req)
+  const location = await lookupLocation(ip)
+  await db.execute({
+    sql: 'UPDATE users SET last_login_at = ?, last_login_ip = ?, last_login_location = ? WHERE id = ?',
+    args: [new Date().toISOString(), ip || null, location, user.id],
+  })
 
   const token = signToken(user)
   const params = new URLSearchParams({

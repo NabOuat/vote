@@ -14,16 +14,46 @@ function formatDate(iso) {
   return new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+function Pagination({ page, pageCount, onChange, colors }) {
+  if (pageCount <= 1) return null
+  const pages = []
+  const add = (n) => { if (!pages.includes(n) && n >= 1 && n <= pageCount) pages.push(n) }
+  add(1); add(page - 1); add(page); add(page + 1); add(pageCount)
+  const sorted = [...new Set(pages)].sort((a, b) => a - b)
+
+  const btnStyle = (active) => ({
+    minWidth: 30, height: 30, padding: '0 8px', borderRadius: 8,
+    border: `1px solid ${active ? colors.green : colors.gray200}`,
+    background: active ? colors.green : colors.white,
+    color: active ? colors.white : colors.gray600,
+    fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+  })
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14, padding: '0 0 14px' }}>
+      <button type="button" onClick={() => onChange(page - 1)} disabled={page === 1} style={{ ...btnStyle(false), opacity: page === 1 ? 0.4 : 1 }}>‹</button>
+      {sorted.map((n, i) => (
+        <span key={n} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {i > 0 && sorted[i - 1] !== n - 1 && <span style={{ color: colors.gray300, fontSize: 12 }}>…</span>}
+          <button type="button" onClick={() => onChange(n)} style={btnStyle(n === page)}>{n}</button>
+        </span>
+      ))}
+      <button type="button" onClick={() => onChange(page + 1)} disabled={page === pageCount} style={{ ...btnStyle(false), opacity: page === pageCount ? 0.4 : 1 }}>›</button>
+    </div>
+  )
+}
+
 export default function AdminStats() {
   const { colors, radius } = theme
   const toast = useToast()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (p) => {
     setLoading(true)
     try {
-      setStats(await getConnectionStats())
+      setStats(await getConnectionStats(p))
     } catch (err) {
       toast.error(err.message ?? 'Erreur.', 'Erreur')
     } finally {
@@ -31,7 +61,7 @@ export default function AdminStats() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(page) }, [load, page])
 
   if (loading) return <div style={{ color: colors.gray400, fontSize: 13 }}>Chargement…</div>
   if (!stats) return <div style={{ color: colors.gray400, fontSize: 13 }}>Statistiques indisponibles.</div>
@@ -92,6 +122,7 @@ export default function AdminStats() {
               <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase' }}>Nom</th>
               <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase' }} className="hide-mobile">Email</th>
               <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase' }}>Rôle</th>
+              <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase' }} className="hide-mobile">Lieu</th>
               <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase' }}>Dernière connexion</th>
             </tr>
           </thead>
@@ -103,16 +134,20 @@ export default function AdminStats() {
                 <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                   <span className={`badge ${ROLE_LABELS[u.role]?.badge ?? 'badge-gray'}`}>{ROLE_LABELS[u.role]?.label ?? u.role}</span>
                 </td>
+                <td style={{ padding: '10px 14px', color: u.last_login_location ? colors.gray600 : colors.gray300 }} className="hide-mobile">
+                  {u.last_login_location ?? '—'}
+                </td>
                 <td style={{ padding: '10px 14px', textAlign: 'right', color: u.last_login_at ? colors.gray700 : colors.gray300 }}>
                   {formatDate(u.last_login_at) ?? 'Jamais connecté'}
                 </td>
               </tr>
             ))}
             {stats.users.length === 0 && (
-              <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: colors.gray400 }}>Aucun compte.</td></tr>
+              <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: colors.gray400 }}>Aucun compte.</td></tr>
             )}
           </tbody>
         </table>
+        <Pagination page={stats.page} pageCount={stats.pageCount} onChange={setPage} colors={colors} />
       </div>
     </div>
   )
