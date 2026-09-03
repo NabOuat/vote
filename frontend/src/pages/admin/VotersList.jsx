@@ -151,7 +151,7 @@ export default function VotersList() {
                 <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.03em' }}>Nom complet</th>
                 {isAdmin && <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.03em' }} className="hide-mobile">Email</th>}
                 <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.03em' }}>Catégorie</th>
-                {isAdmin && <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.03em' }}>Statut</th>}
+                {isAdmin && <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: 700, color: colors.gray700, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.03em' }}>Rôle</th>}
               </tr>
             </thead>
             <tbody>
@@ -173,11 +173,7 @@ export default function VotersList() {
                   </td>
                   {isAdmin && (
                     <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                      {v.active ? (
-                        <span className="badge badge-green">Actif</span>
-                      ) : (
-                        <span className="badge badge-orange">Inactif</span>
-                      )}
+                      <span className="badge badge-green">Votant</span>
                     </td>
                   )}
                 </tr>
