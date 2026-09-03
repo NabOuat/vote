@@ -29,7 +29,8 @@ function Avatar({ user, size, colors }) {
 export default function VoteLayout({ children }) {
   const { colors, radius } = theme
   const { user, signOut } = useVoteAuth()
-  const isAdmin = user?.role === 'ADMIN_VOTE'
+  const isAdmin = user?.role === 'ADMIN_VOTE' || user?.role === 'SUPER_ADMIN'
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const [profileOpen, setProfileOpen] = useState(false)
 
   const linkStyle = ({ isActive }) => ({
@@ -72,6 +73,7 @@ export default function VoteLayout({ children }) {
                 <NavLink to="/admin" style={linkStyle} end>Sessions</NavLink>
                 <NavLink to="/admin/voters/list" style={linkStyle} end>Liste</NavLink>
                 <NavLink to="/mon-vote" style={linkStyle} end>Mon vote</NavLink>
+                {isSuperAdmin && <NavLink to="/admin/administrateurs" style={linkStyle} end>Admins</NavLink>}
               </>
             ) : (
               <>
@@ -118,8 +120,8 @@ export default function VoteLayout({ children }) {
                   </div>
                   <div style={{ fontSize: 14.5, fontWeight: 700, color: colors.gray900, marginTop: 10 }}>{user?.fullName}</div>
                   {user?.poste && <div style={{ fontSize: 12, color: colors.gray500, marginTop: 1 }}>{user.poste}</div>}
-                  <span className={`badge ${isAdmin ? 'badge-purple' : 'badge-green'}`} style={{ marginTop: 8 }}>
-                    {isAdmin ? 'Administrateur' : 'Votant'}
+                  <span className={`badge ${isSuperAdmin ? 'badge-purple' : isAdmin ? 'badge-blue' : 'badge-green'}`} style={{ marginTop: 8 }}>
+                    {isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrateur' : 'Votant'}
                   </span>
                 </div>
 

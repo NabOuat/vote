@@ -23,7 +23,7 @@ authRouter.post('/login', asyncHandler(async (req, res) => {
   }
 
   const token = signToken(user)
-  res.json({ token, role: user.role, fullName: user.full_name, poste: user.poste ?? '', photoPath: user.photo_path ?? '', mobilePhone: user.mobile_phone ?? '' })
+  res.json({ token, id: user.id, role: user.role, fullName: user.full_name, poste: user.poste ?? '', photoPath: user.photo_path ?? '', mobilePhone: user.mobile_phone ?? '' })
 }))
 
 /** Définit (ou redéfinit) le mot de passe personnel de l'utilisateur connecté
@@ -139,7 +139,7 @@ authRouter.get('/microsoft/callback', asyncHandler(async (req, res) => {
 
   const token = signToken(user)
   const params = new URLSearchParams({
-    token, role: user.role, fullName: user.full_name,
+    token, id: String(user.id), role: user.role, fullName: user.full_name,
     poste: user.poste ?? '', photoPath: user.photo_path ?? '', mobilePhone: user.mobile_phone ?? '',
     needsPassword: user.ms_onboarded ? '0' : '1',
   })

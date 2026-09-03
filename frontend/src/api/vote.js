@@ -66,6 +66,12 @@ export const listVoters    = (category) => voteApiFetch(`/admin/voters${category
  * comptes ADMIN_VOTE ne sont jamais touchés. */
 export const clearVoters = () => voteApiFetch('/admin/voters', { method: 'DELETE' })
 
+/* ── Super-admin — gestion des rôles ─────────────────────────────────
+ * Réservé aux comptes SUPER_ADMIN (403 sinon) — voir requireSuperAdmin
+ * côté backend, jamais étendu à ADMIN_VOTE contrairement au reste. */
+export const listAdmins     = () => voteApiFetch('/admin/admins')
+export const updateUserRole = (userId, role) => voteApiFetch(`/admin/users/${userId}/role`, { method: 'PUT', body: JSON.stringify({ role }) })
+
 /* ── Votant ───────────────────────────────────────────────────────── */
 export const listMyVotes    = () => voteApiFetch('/me/votes')
 export const listMyVoters   = () => voteApiFetch('/me/voters')

@@ -2,7 +2,7 @@ import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'node:crypto'
 import { db } from '../db.js'
-import { requireAuth, requireRole } from '../middleware/auth.js'
+import { requireAuth, requireRole, requireSuperAdmin } from '../middleware/auth.js'
 import { uploadCandidatePhoto, storeCandidatePhoto } from '../middleware/upload.js'
 import { tallyTour } from '../services/tally.service.js'
 import { asyncHandler } from '../lib/asyncHandler.js'
@@ -331,6 +331,33 @@ adminRouter.delete('/voters', asyncHandler(async (req, res) => {
   res.json({ deleted: targets.length })
 }))
 
+/* ── Gestion des rôles (réservé aux super-admins) ─────────────────────
+ * Un super-admin peut promouvoir/rétrograder n'importe quel compte entre
+ * VOTER, ADMIN_VOTE et SUPER_ADMIN. Un admin normal ne peut pas se
+ * promouvoir lui-même — requireSuperAdmin n'est jamais étendu par
+ * requireRole, contrairement à ADMIN_VOTE (voir middleware/auth.js). */
+adminRouter.get('/admins', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const { rows } = await db.execute(
+    "SELECT id, username, full_name, role, category, poste FROM users WHERE role IN ('ADMIN_VOTE','SUPER_ADMIN') ORDER BY role, full_name"
+  )
+  res.json(rows)
+}))
+
+adminRouter.put('/users/:userId/role', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const { role } = req.body ?? {}
+  if (!['VOTER', 'ADMIN_VOTE', 'SUPER_ADMIN'].includes(role)) {
+    return res.status(400).json({ message: 'role doit être VOTER, ADMIN_VOTE ou SUPER_ADMIN.' })
+  }
+  const userId = Number(req.params.userId)
+  if (userId === req.user.sub && role !== 'SUPER_ADMIN') {
+    return res.status(409).json({ message: 'Impossible de se retirer soi-même les droits super-admin.' })
+  }
+  const { rows: [target] } = await db.execute({ sql: 'SELECT id FROM users WHERE id = ?', args: [userId] })
+  if (!target) return res.status(404).json({ message: 'Compte introuvable.' })
+  await db.execute({ sql: 'UPDATE users SET role = ? WHERE id = ?', args: [role, userId] })
+  res.json({ message: 'Rôle mis à jour.' })
+}))
+
 /** Recherche parmi les comptes existants (votants + admins) — utilisé par
  * l'admin pour choisir un candidat parmi les employés déjà importés, plutôt
  * que de ressaisir un nom à la main. */
@@ -338,7 +365,7 @@ adminRouter.get('/users/search', asyncHandler(async (req, res) => {
   const q = (req.query.q ?? '').trim()
   if (q.length < 2) return res.json([])
   const { rows } = await db.execute({
-    sql: 'SELECT id, full_name, poste, photo_path FROM users WHERE active = 1 AND full_name LIKE ? ORDER BY full_name LIMIT 20',
+    sql: 'SELECT id, username, full_name, role, poste, photo_path FROM users WHERE active = 1 AND full_name LIKE ? ORDER BY full_name LIMIT 20',
     args: [`%${q}%`],
   })
   res.json(rows)

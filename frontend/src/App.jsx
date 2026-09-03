@@ -13,6 +13,7 @@ import SessionDetail from './pages/admin/SessionDetail.jsx'
 import VoteManage from './pages/admin/VoteManage.jsx'
 import VotersImport from './pages/admin/VotersImport.jsx'
 import VotersList from './pages/admin/VotersList.jsx'
+import AdminManagement from './pages/admin/AdminManagement.jsx'
 
 function Spinner() {
   return (
@@ -25,7 +26,8 @@ function Spinner() {
 
 function AuthedApp() {
   const { user } = useVoteAuth()
-  const isAdmin = user.role === 'ADMIN_VOTE'
+  const isAdmin = user.role === 'ADMIN_VOTE' || user.role === 'SUPER_ADMIN'
+  const isSuperAdmin = user.role === 'SUPER_ADMIN'
   const [showWelcome, setShowWelcome] = useState(() => localStorage.getItem('vote_needs_password') === '1')
 
   return (
@@ -40,6 +42,7 @@ function AuthedApp() {
             <Route path="/admin/votes/:voteId"        element={<VoteManage />} />
             {/* Les comptes RH sont aussi votants — ils gardent accès à leur propre bulletin. */}
             <Route path="/mon-vote"                   element={<VoterDashboard />} />
+            {isSuperAdmin && <Route path="/admin/administrateurs" element={<AdminManagement />} />}
             <Route path="*"                           element={<Navigate to="/admin" replace />} />
           </>
         ) : (

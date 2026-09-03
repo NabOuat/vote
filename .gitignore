@@ -14,9 +14,13 @@ server/vote.db-wal
 # Photos de candidats uploadées
 server/uploads/
 
-# Fichiers d'import employés — noms/emails/mots de passe en clair, JAMAIS commité
+# Fichiers d'import/rapprochement employés — noms/emails/mots de passe en
+# clair, JAMAIS commité
 employees_import.json
 *_import.json
+csp_matched.json
+csp_unmatched.json
+rh_import.json
 *.xlsx
 
 # Variables d'environnement — NE JAMAIS COMMITTER

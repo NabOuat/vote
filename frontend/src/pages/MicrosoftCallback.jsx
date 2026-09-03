@@ -12,6 +12,7 @@ export default function MicrosoftCallback() {
 
   useEffect(() => {
     const token = params.get('token')
+    const id = params.get('id')
     const role = params.get('role')
     const fullName = params.get('fullName')
     const poste = params.get('poste') ?? ''
@@ -19,7 +20,7 @@ export default function MicrosoftCallback() {
     const mobilePhone = params.get('mobilePhone') ?? ''
     if (token && role && fullName) {
       voteTokenStore.set(token)
-      localStorage.setItem('vote_user', JSON.stringify({ role, fullName, poste, photoPath, mobilePhone }))
+      localStorage.setItem('vote_user', JSON.stringify({ id: id ? Number(id) : undefined, role, fullName, poste, photoPath, mobilePhone }))
       // Première connexion Microsoft de ce compte → WelcomePasswordModal se
       // charge de le proposer une fois arrivé dans l'app, puis nettoie ce
       // marqueur (voir set-password / skip-password-setup côté backend).
